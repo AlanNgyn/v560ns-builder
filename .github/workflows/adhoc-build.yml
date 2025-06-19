@@ -77,14 +77,14 @@ jobs:
         run: bundle exec fastlane ios adhoc env:${{ github.event.inputs.environment }}
 
       # Upload IPA artifact for debugging/storage
-      - name: Upload IPA artifact
-        uses: actions/upload-artifact@v3
-        with:
-          name: ios-ipa
-          path: real-code/ios/build/*.ipa
+      # - name: Upload IPA artifact
+      #   uses: actions/upload-artifact@v3
+      #   with:
+      #     name: ios-ipa
+      #     path: real-code/ios/build/*.ipa
 
   android-adhoc:
-    name: Android AdHoc Build
+    name: Android AdHoc Build 
     runs-on: ubuntu-latest
     steps:
       # Checkout this config repository
@@ -140,8 +140,8 @@ jobs:
         run: bundle exec fastlane android adhoc env:${{ github.event.inputs.environment }}
 
       # Upload APK artifact for debugging/storage
-      - name: Upload APK artifact
-        uses: actions/upload-artifact@v3
-        with:
-          name: android-apk
-          path: real-code/android/app/build/outputs/apk/**/*.apk
+      # - name: Upload APK artifact
+      #   uses: actions/upload-artifact@v3
+      #   with:
+      #     name: android-apk
+      #     path: real-code/android/app/build/outputs/apk/**/*.apk

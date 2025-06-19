@@ -25,12 +25,21 @@ jobs:
         with:
           fetch-depth: 1
 
+      # Configure SSH with private key for accessing real repo
+      - name: Setup SSH for private repo
+        run: |
+          mkdir -p ~/.ssh
+          echo "${{ secrets.SSH_PRIVATE_KEY }}" > ~/.ssh/id_rsa
+          chmod 600 ~/.ssh/id_rsa
+          echo -e "Host ${{ secrets.PRIVATE_HOST }}\n  HostName ${{ secrets.PRIVATE_HOST }}\n  IdentityFile ~/.ssh/id_rsa\n" >> ~/.ssh/config
+
       # Checkout the actual application code
       - name: Checkout real code
         uses: actions/checkout@v4
         with:
           repository: ${{ secrets.PRIVATE_REPO_FULL_NAME }}
           ref: ${{ github.event.inputs.branch }}
+          ssh-key: ${{ secrets.SSH_PRIVATE_KEY }}
           path: real-code
 
       # Install JS dependencies
@@ -84,12 +93,21 @@ jobs:
         with:
           fetch-depth: 1
 
+      # Configure SSH for real repo access
+      - name: Setup SSH for private repo
+        run: |
+          mkdir -p ~/.ssh
+          echo "${{ secrets.SSH_PRIVATE_KEY }}" > ~/.ssh/id_rsa
+          chmod 600 ~/.ssh/id_rsa
+          echo -e "Host ${{ secrets.PRIVATE_HOST }}\n  HostName ${{ secrets.PRIVATE_HOST }}\n  IdentityFile ~/.ssh/id_rsa\n" >> ~/.ssh/config
+
       # Checkout the actual application code
       - name: Checkout real code
         uses: actions/checkout@v4
         with:
           repository: ${{ secrets.PRIVATE_REPO_FULL_NAME }}
           ref: ${{ github.event.inputs.branch }}
+          ssh-key: ${{ secrets.SSH_PRIVATE_KEY }}
           path: real-code
 
       # Install JS dependencies

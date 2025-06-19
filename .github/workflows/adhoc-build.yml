@@ -29,7 +29,7 @@ jobs:
       - name: Checkout real code
         run: |
           git clone --branch ${{ github.event.inputs.branch }} --single-branch \
-            ${{ secrets.PRIVATE_REPO_SSH_URL }} real-code
+            ${{ secrets.PRIVATE_REPO_FULL_NAME }} real-code
 
       # Install JS dependencies
       - name: Install JS dependencies

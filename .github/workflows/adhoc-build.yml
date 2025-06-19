@@ -19,12 +19,6 @@ jobs:
     name: iOS AdHoc Build
     runs-on: macos-latest
     steps:
-      # Checkout this config repository
-      - name: Checkout CI config
-        uses: actions/checkout@v4
-        with:
-          fetch-depth: 1
-
       # Checkout the actual application code
       - name: Checkout real code
         run: |

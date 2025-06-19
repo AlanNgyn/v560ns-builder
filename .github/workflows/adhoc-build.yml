@@ -48,7 +48,6 @@ jobs:
         run: |
           cd real-code
           gem install bundler
-          bundle install
 
       # Install CocoaPods dependencies
       - name: iOS Pod install

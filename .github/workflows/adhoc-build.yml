@@ -70,14 +70,14 @@ jobs:
 
       - name: Upload Gym log as artifact
         if: failure()
-        uses: actions/upload-artifact@v3
+        uses: actions/upload-artifact@v4
         with:
           name: gym-log
           path: "/Users/runner/Library/Logs/gym/TemoorstAppDevelopment-TemoorstApp Development Release.log"
 
       # Upload IPA artifact for debugging/storage
       # - name: Upload IPA artifact
-      #   uses: actions/upload-artifact@v3
+      #   uses: actions/upload-artifact@v4
       #   with:
       #     name: ios-ipa
       #     path: real-code/ios/build/*.ipa
@@ -141,7 +141,7 @@ jobs:
 
       # Upload APK artifact for debugging/storage
       # - name: Upload APK artifact
-      #   uses: actions/upload-artifact@v3
+      #   uses: actions/upload-artifact@v4
       #   with:
       #     name: android-apk
       #     path: real-code/android/app/build/outputs/apk/**/*.apk

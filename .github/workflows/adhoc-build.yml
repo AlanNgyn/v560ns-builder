@@ -86,7 +86,7 @@ jobs:
 
       - name: iOS Pod install
         working-directory: real-code/ios
-        run: pod install --repo-update
+        run: pod install
 
       # Build and upload AdHoc via Fastlane
       - name: Build & AdHoc via Fastlane

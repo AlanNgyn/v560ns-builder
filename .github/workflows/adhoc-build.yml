@@ -44,15 +44,15 @@ jobs:
         uses: ruby/setup-ruby@v1
         with:
           ruby-version: "3.4.4"
-      - name: Install Bundler
-        run: |
-          cd real-code
-          gem install bundler
+      # - name: Install Bundler
+      #   run: |
+      #     cd real-code
+      #     gem install bundler
 
       # Install CocoaPods dependencies
       - name: iOS Pod install
         working-directory: real-code/ios
-        run: bundle exec pod install --repo-update
+        run: pod install --repo-update
 
       # Build and upload AdHoc via Fastlane
       - name: Build & AdHoc via Fastlane
@@ -66,7 +66,7 @@ jobs:
           DIAWI_API_TOKEN: ${{ secrets.DIAWI_API_TOKEN }}
           GDRIVE_FOLDER_STAGING_ID: ${{ secrets.GDRIVE_FOLDER_STAGING_ID }}
           GDRIVE_FOLDER_LIVE_ID: ${{ secrets.GDRIVE_FOLDER_LIVE_ID }}
-        run: bundle exec fastlane ios adhoc env:${{ github.event.inputs.environment }}
+        run: fastlane ios adhoc env:${{ github.event.inputs.environment }}
 
       # Upload IPA artifact for debugging/storage
       # - name: Upload IPA artifact

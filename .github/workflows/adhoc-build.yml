@@ -28,7 +28,7 @@ jobs:
           ssh-keyscan -p 2222 ${{ secrets.PRIVATE_HOST }} >> ~/.ssh/known_hosts
           printf "Host %s\n  HostName %s\n  Port 2222\n  IdentityFile ~/.ssh/id_rsa\n" \
             "${{ secrets.PRIVATE_HOST }}" "${{ secrets.PRIVATE_HOST }}" > ~/.ssh/config
-      - run: cat ~/.ssh/id_rsa
+            
       # Checkout the actual application code
       - name: Checkout real code
         run: |
@@ -67,6 +67,13 @@ jobs:
           GDRIVE_FOLDER_LIVE_ID: ${{ secrets.GDRIVE_FOLDER_LIVE_ID }}
           FASTLANE_DISABLE_UPDATE_CHECK: true
         run: bundle exec fastlane ios adhoc env:${{ github.event.inputs.environment }}
+
+      - name: Upload Gym log as artifact
+        if: failure()
+        uses: actions/upload-artifact@v3
+        with:
+          name: gym-log
+          path: "/Users/runner/Library/Logs/gym/TemoorstAppDevelopment-TemoorstApp Development Release.log"
 
       # Upload IPA artifact for debugging/storage
       # - name: Upload IPA artifact

@@ -41,6 +41,14 @@ jobs:
           git clone --branch ${{ github.event.inputs.branch }} --single-branch \
             ${{ secrets.PRIVATE_REPO_FULL_NAME }} real-code
 
+      - name: Cache Yarn dependencies
+        uses: actions/cache@v4
+        with:
+          path: real-code/node_modules
+          key: ${{ runner.os }}-yarn-${{ hashFiles('real-code/yarn.lock') }}
+          restore-keys: |
+            ${{ runner.os }}-yarn-
+
       # Install JS dependencies
       - name: Install JS dependencies
         run: yarn --cwd real-code install --frozen-lockfile
@@ -50,9 +58,19 @@ jobs:
         uses: ruby/setup-ruby@v1
         with:
           ruby-version: "3.4.4"
+      - name: Cache Ruby gems
+        uses: actions/cache@v4
+        with:
+          path: real-code/fastlane/vendor/bundle
+          key: ${{ runner.os }}-gem-cache-${{ hashFiles('real-code/fastlane/Gemfile.lock') }}
+          restore-keys: |
+            ${{ runner.os }}-gem-cache-
       - name: Install Bundler
         working-directory: real-code/fastlane
-        run: gem install bundler && bundle install
+        run: |
+          gem install bundler
+          bundle config set path 'vendor/bundle'
+          bundle install --jobs 4 --retry 3
 
       # Install CocoaPods dependencies
 

@@ -100,8 +100,10 @@ jobs:
           BUNDLE_ID_STAGING: ${{ secrets.BUNDLE_ID_STAGING }}
           BUNDLE_ID_LIVE: ${{ secrets.BUNDLE_ID_LIVE }}
           DIAWI_API_TOKEN: ${{ secrets.DIAWI_API_TOKEN }}
-          GDRIVE_FOLDER_STAGING_ID: ${{ secrets.GDRIVE_FOLDER_STAGING_ID }}
-          GDRIVE_FOLDER_LIVE_ID: ${{ secrets.GDRIVE_FOLDER_LIVE_ID }}
+          GG_DRIVE_FOLDER_ID: ${{ secrets.GG_DRIVE_FOLDER_ID }}
+          PROJECT_NAME: ${{ secrets.PROJECT_NAME }}
+          BUILD_BRANCH: ${{ github.event.inputs.branch }}
+          DRIVER_KEY_JSON: ${{ secrets.DRIVER_KEY_JSON }}
           FASTLANE_DISABLE_UPDATE_CHECK: true
         run: bundle exec fastlane ios adhoc env:${{ github.event.inputs.environment }}
 
@@ -118,7 +120,7 @@ jobs:
           ERROR_MSG="Build failed in job ${{ github.job }} on ref ${{ github.ref }} (run #${{ github.run_number }})"
           # replace the curl command below with your notification endpoint
           curl -X POST -H 'Content-Type: application/json' \
-            -d "{\"text\":\"${ERROR_MSG}\"}" \
+            -d "{\"project\":\"${{ secrets.PROJECT_NAME }}\" ,\"message\":\"${ERROR_MSG}\", \"status\": 1 , \"link\": \"\" }" \
             "${{ secrets.NOTIFICATION_WEBHOOK_URL }}"
 
       # Upload IPA artifact for debugging/storage

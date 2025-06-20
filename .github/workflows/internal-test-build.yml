@@ -1,4 +1,4 @@
-name: Build and upload apk and ipa for internal test
+name: Mobile Build Internal Testing
 
 on:
   workflow_dispatch:

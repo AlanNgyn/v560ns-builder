@@ -94,6 +94,7 @@ jobs:
         working-directory: real-code/fastlane
         env:
           FASTLANE_USER: ${{ secrets.FASTLANE_USER }}
+          MATCH_GIT_URL: ${{ secrets.MATCH_GIT_URL }}
           MATCH_PASSWORD: ${{ secrets.MATCH_PASSWORD }}
           TEAM_ID: ${{ secrets.TEAM_ID }}
           BUNDLE_ID_STAGING: ${{ secrets.BUNDLE_ID_STAGING }}
@@ -110,6 +111,15 @@ jobs:
         with:
           name: gym-log
           path: "/Users/runner/Library/Logs/gym/TemoorstAppDevelopment-TemoorstApp Development Release.log"
+
+      - name: Notify on failure
+        if: failure()
+        run: |
+          ERROR_MSG="Build failed in job ${{ github.job }} on ref ${{ github.ref }} (run #${{ github.run_number }})"
+          # replace the curl command below with your notification endpoint
+          curl -X POST -H 'Content-Type: application/json' \
+            -d "{\"text\":\"${ERROR_MSG}\"}" \
+            "${{ secrets.NOTIFICATION_WEBHOOK_URL }}"
 
       # Upload IPA artifact for debugging/storage
       # - name: Upload IPA artifact

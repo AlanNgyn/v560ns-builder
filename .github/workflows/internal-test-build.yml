@@ -14,13 +14,23 @@ on:
 
 jobs:
   ios-adhoc:
-    uses: ./.github/actions/ios/adhoc-build
-    with:
-      branch: ${{ inputs.branch }}
-      environment: ${{ inputs.environment }}
+    runs-on: macos-15
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+      - name: Run iOS AdHoc composite action
+        uses: ./.github/actions/ios/adhoc-build
+        with:
+          branch: ${{ inputs.branch }}
+          environment: ${{ inputs.environment }}
 
   android-apk:
-    uses: ./.github/actions/android/apk-build
-    with:
-      branch: ${{ inputs.branch }}
-      environment: ${{ inputs.environment }}
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+      - name: Run Android APK composite action
+        uses: ./.github/actions/android/apk-build
+        with:
+          branch: ${{ inputs.branch }}
+          environment: ${{ inputs.environment }}

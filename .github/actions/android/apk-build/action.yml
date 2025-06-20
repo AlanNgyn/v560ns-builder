@@ -8,70 +8,60 @@ inputs:
     required: true
     type: string
 
-jobs:
-  build-apk:
-    name: Android build APK
-    runs-on: ubuntu-latest
-    steps:
-      - name: Setup SSH for private repo
-        run: |
-          mkdir -p ~/.ssh
-          cat << 'EOF' > ~/.ssh/id_rsa
-          ${{ secrets.SSH_PRIVATE_KEY }}
-          EOF
-          chmod 600 ~/.ssh/id_rsa
-          ssh-keyscan -p 2222 ${{ secrets.PRIVATE_HOST }} >> ~/.ssh/known_hosts
-          printf "Host %s\n  HostName %s\n  Port 2222\n  IdentityFile ~/.ssh/id_rsa\n" \
-            "${{ secrets.PRIVATE_HOST }}" "${{ secrets.PRIVATE_HOST }}" > ~/.ssh/config
+runs:
+  using: "composite"
+  steps:
+    - name: Setup SSH for private repo
+      run: |
+        mkdir -p ~/.ssh
+        cat << 'EOF' > ~/.ssh/id_rsa
+        ${{ secrets.SSH_PRIVATE_KEY }}
+        EOF
+        chmod 600 ~/.ssh/id_rsa
+        ssh-keyscan -p 2222 ${{ secrets.PRIVATE_HOST }} >> ~/.ssh/known_hosts
+        printf "Host %s\n  HostName %s\n  Port 2222\n  IdentityFile ~/.ssh/id_rsa\n" \
+          "${{ secrets.PRIVATE_HOST }}" "${{ secrets.PRIVATE_HOST }}" > ~/.ssh/config
 
-      - name: Checkout real code
-        run: |
-          git clone --branch ${{ github.event.inputs.branch }} --single-branch \
-            ${{ secrets.PRIVATE_REPO_FULL_NAME }} real-code
+    - name: Checkout real code
+      run: |
+        git clone --branch ${{ github.event.inputs.branch }} --single-branch \
+          ${{ secrets.PRIVATE_REPO_FULL_NAME }} real-code
 
-      - name: Cache Yarn dependencies
-        uses: actions/cache@v4
-        with:
-          path: real-code/node_modules
-          key: ${{ runner.os }}-yarn-${{ hashFiles('real-code/yarn.lock') }}
-          restore-keys: |
-            ${{ runner.os }}-yarn-
+    - name: Cache Yarn dependencies
+      uses: actions/cache@v4
+      with:
+        path: |
+          real-code/node_modules
+          ~/.cache/yarn
+        key: yarn-${{ hashFiles('real-code/yarn.lock') }}
+        restore-keys: |
+          yarn-
 
-      - name: Install JS dependencies
-        run: yarn --cwd real-code install  --silent
+    - name: Install JS dependencies
+      run: yarn --cwd real-code install  --silent
 
-      - name: Cache Yarn dependencies
-        uses: actions/cache@v4
-        with:
-          path: |
-            real-code/node_module
-            ~/.cache/yarn
-          key: yarn-${{ hashFiles('real-code/yarn.lock') }}
-          restore-keys: |
-            yarn-
+    - name: Build APK via Fastlane
+      working-directory: real-code/fastlane
+      env:
+        FASTLANE_USER: ${{ secrets.FASTLANE_USER }}
+        MATCH_GIT_URL: ${{ secrets.MATCH_GIT_URL }}
+        MATCH_PASSWORD: ${{ secrets.MATCH_PASSWORD }}
+        TEAM_ID: ${{ secrets.TEAM_ID }}
+        BUNDLE_ID_STAGING: ${{ secrets.BUNDLE_ID_STAGING }}
+        BUNDLE_ID_LIVE: ${{ secrets.BUNDLE_ID_LIVE }}
+        DIAWI_API_TOKEN: ${{ secrets.DIAWI_API_TOKEN }}
+        GG_DRIVE_FOLDER_ID: ${{ secrets.GG_DRIVE_FOLDER_ID }}
+        PROJECT_NAME: ${{ secrets.PROJECT_NAME }}
+        BUILD_BRANCH: ${{ github.event.inputs.branch }}
+        DRIVER_KEY_JSON: ${{ secrets.DRIVER_KEY_JSON }}
+        FASTLANE_DISABLE_UPDATE_CHECK: true
+      run: bundle exec fastlane android apk env:${{ github.event.inputs.environment }}
 
-      - name: Build APK via Fastlane
-        working-directory: real-code/fastlane
-        env:
-          FASTLANE_USER: ${{ secrets.FASTLANE_USER }}
-          MATCH_GIT_URL: ${{ secrets.MATCH_GIT_URL }}
-          MATCH_PASSWORD: ${{ secrets.MATCH_PASSWORD }}
-          TEAM_ID: ${{ secrets.TEAM_ID }}
-          BUNDLE_ID_STAGING: ${{ secrets.BUNDLE_ID_STAGING }}
-          BUNDLE_ID_LIVE: ${{ secrets.BUNDLE_ID_LIVE }}
-          DIAWI_API_TOKEN: ${{ secrets.DIAWI_API_TOKEN }}
-          GG_DRIVE_FOLDER_ID: ${{ secrets.GG_DRIVE_FOLDER_ID }}
-          PROJECT_NAME: ${{ secrets.PROJECT_NAME }}
-          BUILD_BRANCH: ${{ github.event.inputs.branch }}
-          DRIVER_KEY_JSON: ${{ secrets.DRIVER_KEY_JSON }}
-          FASTLANE_DISABLE_UPDATE_CHECK: true
-        run: bundle exec fastlane android apk env:${{ github.event.inputs.environment }}
-
-      - name: Notify on failure
-        if: failure()
-        run: |
-          ERROR_MSG="Build failed in job ${{ github.job }} on ref ${{ github.ref }} (run #${{ github.run_number }})"
-          # replace the curl command below with your notification endpoint
-          curl -X POST -H 'Content-Type: application/json' \
-            -d "{\"project\":\"${{ secrets.PROJECT_NAME }}\" ,\"message\":\"${ERROR_MSG}\", \"status\": 1 , \"link\": \"\" }" \
-            "${{ secrets.NOTIFICATION_WEBHOOK_URL }}"
+    - name: Notify on failure
+      if: failure()
+      run: |
+        ERROR_MSG="Build failed in job ${{ github.job }} on ref ${{ github.ref }} (run #${{ github.run_number }})"
+        # replace the curl command below with your notification endpoint
+        curl -X POST -H 'Content-Type: application/json' \
+          -d "{\"project\":\"${{ secrets.PROJECT_NAME }}\" ,\"message\":\"${ERROR_MSG}\", \"status\": 1 , \"link\": \"\" }" \
+          "${{ secrets.NOTIFICATION_WEBHOOK_URL }}"

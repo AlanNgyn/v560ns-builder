@@ -188,18 +188,6 @@ jobs:
           restore-keys: |
             gradle-${{ hashFiles('real-code/android/gradle/wrapper/gradle-wrapper.properties') }}-
 
-      - name: Gradle build for flavor
-        shell: bash
-        run: |
-          cd real-code/android
-          chmod +x ./gradlew
-          case "${{ github.event.inputs.environment }}" in
-            staging) FLAVOR="Development" ;;
-            live)    FLAVOR="Production"    ;;
-            *)       FLAVOR="${{ github.event.inputs.environment }}" ;;
-          esac
-          ./gradlew clean assemble${FLAVOR}Release --no-daemon
-
       - name: Build APK via Fastlane
         working-directory: real-code/fastlane
         env:

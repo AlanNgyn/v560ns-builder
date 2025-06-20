@@ -1,0 +1,26 @@
+name: Build and upload apk & ipa for internal test
+
+on:
+  workflow_dispatch:
+    inputs:
+      branch:
+        description: "Build Branch"
+        required: true
+        default: "develop"
+      environment:
+        description: "Select environment (staging or live)"
+        required: true
+        default: "staging"
+
+jobs:
+  ios-adhoc:
+    uses: ./.github/workflows/ios/adhoc-build.yml
+    with:
+      branch: ${{ inputs.branch }}
+      environment: ${{ inputs.environment }}
+
+  android-apk:
+    uses: ./.github/workflows/android/apk-build.yml
+    with:
+      branch: ${{ inputs.branch }}
+      environment: ${{ inputs.environment }}

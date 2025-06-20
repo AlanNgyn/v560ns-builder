@@ -1,4 +1,4 @@
-name: Build and upload apk & ipa for internal test
+name: Build and upload apk and ipa for internal test
 
 on:
   workflow_dispatch:
@@ -15,7 +15,7 @@ on:
 jobs:
   ios-adhoc:
     name: iOS AdHoc Build
-    runs-on: macos-latest
+    runs-on: macos-15
     timeout-minutes: 30
     steps:
       - name: Create fastlane keychain
@@ -24,7 +24,7 @@ jobs:
           security default-keychain -s fastlane.keychain
           security unlock-keychain -p "" fastlane.keychain
 
-      - name: Setup SSH for private repo
+      - &setup-ssh name: Setup SSH for private repo
         run: |
           mkdir -p ~/.ssh
           cat << 'EOF' > ~/.ssh/id_rsa
@@ -36,12 +36,13 @@ jobs:
             "${{ secrets.PRIVATE_HOST }}" "${{ secrets.PRIVATE_HOST }}" > ~/.ssh/config
             
       # Checkout the actual application code
-      - name: Checkout real code
+      - &checkout-real-code name: Checkout real code
         run: |
           git clone --branch ${{ github.event.inputs.branch }} --single-branch \
             ${{ secrets.PRIVATE_REPO_FULL_NAME }} real-code
 
-      - name: Cache Yarn dependencies
+      - &cache-yarn
+        name: Cache Yarn dependencies
         uses: actions/cache@v4
         with:
           path: |
@@ -51,7 +52,8 @@ jobs:
           restore-keys: |
             yarn-
 
-      - name: Install JS dependencies
+      - &install-js
+        name: Install JS dependencies
         shell: bash
         run: yarn --cwd real-code install --silent
 
@@ -111,7 +113,7 @@ jobs:
           name: gym-log
           path: "/Users/runner/Library/Logs/gym/TemoorstAppDevelopment-TemoorstApp Development Release.log"
 
-      - name: Notify on failure
+      - &notify-on-failure name: Notify on failure
         if: failure()
         run: |
           ERROR_MSG="Build failed in job ${{ github.job }} on ref ${{ github.ref }} (run #${{ github.run_number }})"
@@ -120,7 +122,7 @@ jobs:
             -d "{\"project\":\"${{ secrets.PROJECT_NAME }}\" ,\"message\":\"${ERROR_MSG}\", \"status\": 1 , \"link\": \"\" }" \
             "${{ secrets.NOTIFICATION_WEBHOOK_URL }}"
 
-  # build-apk:
+  build-apk:
     name: Android build APK
     runs-on: ubuntu-latest
     steps:

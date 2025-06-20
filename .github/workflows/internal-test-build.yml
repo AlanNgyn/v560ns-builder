@@ -24,8 +24,7 @@ jobs:
           security default-keychain -s fastlane.keychain
           security unlock-keychain -p "" fastlane.keychain
 
-      - &setup-ssh
-        name: Setup SSH for private repo
+      - name: Setup SSH for private repo
         run: |
           mkdir -p ~/.ssh
           cat << 'EOF' > ~/.ssh/id_rsa
@@ -37,14 +36,12 @@ jobs:
             "${{ secrets.PRIVATE_HOST }}" "${{ secrets.PRIVATE_HOST }}" > ~/.ssh/config
             
       # Checkout the actual application code
-      - &checkout-real-code
-        name: Checkout real code
+      - name: Checkout real code
         run: |
           git clone --branch ${{ github.event.inputs.branch }} --single-branch \
             ${{ secrets.PRIVATE_REPO_FULL_NAME }} real-code
 
-      - &cache-yarn
-        name: Cache Yarn dependencies
+      - name: Cache Yarn dependencies
         uses: actions/cache@v4
         with:
           path: |
@@ -54,8 +51,7 @@ jobs:
           restore-keys: |
             yarn-
 
-      - &install-js
-        name: Install JS dependencies
+      - name: Install JS dependencies
         shell: bash
         run: yarn --cwd real-code install --silent
 
@@ -115,8 +111,7 @@ jobs:
           name: gym-log
           path: "/Users/runner/Library/Logs/gym/TemoorstAppDevelopment-TemoorstApp Development Release.log"
 
-      - &notify-on-failure
-        name: Notify on failure
+      - name: Notify on failure
         if: failure()
         run: |
           ERROR_MSG="Build failed in job ${{ github.job }} on ref ${{ github.ref }} (run #${{ github.run_number }})"
@@ -129,10 +124,36 @@ jobs:
     name: Android build APK
     runs-on: ubuntu-latest
     steps:
-      - *setup-ssh
-      - *checkout-real-code
-      - *cache-yarn
-      - *install-js
+      - name: Setup SSH for private repo
+        run: |
+          mkdir -p ~/.ssh
+          cat << 'EOF' > ~/.ssh/id_rsa
+          ${{ secrets.SSH_PRIVATE_KEY }}
+          EOF
+          chmod 600 ~/.ssh/id_rsa
+          ssh-keyscan -p 2222 ${{ secrets.PRIVATE_HOST }} >> ~/.ssh/known_hosts
+          printf "Host %s\n  HostName %s\n  Port 2222\n  IdentityFile ~/.ssh/id_rsa\n" \
+            "${{ secrets.PRIVATE_HOST }}" "${{ secrets.PRIVATE_HOST }}" > ~/.ssh/config
+            
+      # Checkout the actual application code
+      - name: Checkout real code
+        run: |
+          git clone --branch ${{ github.event.inputs.branch }} --single-branch \
+            ${{ secrets.PRIVATE_REPO_FULL_NAME }} real-code
+
+      - name: Cache Yarn dependencies
+        uses: actions/cache@v4
+        with:
+          path: |
+            real-code/node_modules
+            ~/.cache/yarn
+          key: yarn-${{ hashFiles('real-code/yarn.lock') }}
+          restore-keys: |
+            yarn-
+
+      - name: Install JS dependencies
+        shell: bash
+        run: yarn --cwd real-code install --silent
 
       - name: Build APK via Fastlane
         working-directory: real-code/fastlane

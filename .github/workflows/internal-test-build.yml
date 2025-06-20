@@ -15,6 +15,22 @@ on:
 jobs:
   ios-adhoc:
     runs-on: macos-15
+    env:
+      FASTLANE_USER: ${{ secrets.FASTLANE_USER }}
+      MATCH_GIT_URL: ${{ secrets.MATCH_GIT_URL }}
+      MATCH_PASSWORD: ${{ secrets.MATCH_PASSWORD }}
+      TEAM_ID: ${{ secrets.TEAM_ID }}
+      BUNDLE_ID_STAGING: ${{ secrets.BUNDLE_ID_STAGING }}
+      BUNDLE_ID_LIVE: ${{ secrets.BUNDLE_ID_LIVE }}
+      DIAWI_API_TOKEN: ${{ secrets.DIAWI_API_TOKEN }}
+      GG_DRIVE_FOLDER_ID: ${{ secrets.GG_DRIVE_FOLDER_ID }}
+      PROJECT_NAME: ${{ secrets.PROJECT_NAME }}
+      BUILD_BRANCH: ${{ github.event.inputs.branch }}
+      DRIVER_KEY_JSON: ${{ secrets.DRIVER_KEY_JSON }}
+      NOTIFICATION_WEBHOOK_URL: ${{ secrets.NOTIFICATION_WEBHOOK_URL }}
+      SSH_PRIVATE_KEY: ${{ secrets.SSH_PRIVATE_KEY }}
+      PRIVATE_REPO_FULL_NAME: ${{ secrets.PRIVATE_REPO_FULL_NAME }}
+      PRIVATE_HOST: ${{ secrets.PRIVATE_HOST }}
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
@@ -26,6 +42,22 @@ jobs:
 
   android-apk:
     runs-on: ubuntu-latest
+    env:
+      FASTLANE_USER: ${{ secrets.FASTLANE_USER }}
+      MATCH_GIT_URL: ${{ secrets.MATCH_GIT_URL }}
+      MATCH_PASSWORD: ${{ secrets.MATCH_PASSWORD }}
+      TEAM_ID: ${{ secrets.TEAM_ID }}
+      BUNDLE_ID_STAGING: ${{ secrets.BUNDLE_ID_STAGING }}
+      BUNDLE_ID_LIVE: ${{ secrets.BUNDLE_ID_LIVE }}
+      DIAWI_API_TOKEN: ${{ secrets.DIAWI_API_TOKEN }}
+      GG_DRIVE_FOLDER_ID: ${{ secrets.GG_DRIVE_FOLDER_ID }}
+      PROJECT_NAME: ${{ secrets.PROJECT_NAME }}
+      BUILD_BRANCH: ${{ github.event.inputs.branch }}
+      DRIVER_KEY_JSON: ${{ secrets.DRIVER_KEY_JSON }}
+      NOTIFICATION_WEBHOOK_URL: ${{ secrets.NOTIFICATION_WEBHOOK_URL }}
+      SSH_PRIVATE_KEY: ${{ secrets.SSH_PRIVATE_KEY }}
+      PRIVATE_REPO_FULL_NAME: ${{ secrets.PRIVATE_REPO_FULL_NAME }}
+      PRIVATE_HOST: ${{ secrets.PRIVATE_HOST }}
     steps:
       - name: Checkout code
         uses: actions/checkout@v4

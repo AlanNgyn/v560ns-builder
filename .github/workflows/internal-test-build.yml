@@ -24,7 +24,8 @@ jobs:
           security default-keychain -s fastlane.keychain
           security unlock-keychain -p "" fastlane.keychain
 
-      - &setup-ssh name: Setup SSH for private repo
+      - &setup-ssh
+        name: Setup SSH for private repo
         run: |
           mkdir -p ~/.ssh
           cat << 'EOF' > ~/.ssh/id_rsa
@@ -36,7 +37,8 @@ jobs:
             "${{ secrets.PRIVATE_HOST }}" "${{ secrets.PRIVATE_HOST }}" > ~/.ssh/config
             
       # Checkout the actual application code
-      - &checkout-real-code name: Checkout real code
+      - &checkout-real-code
+        name: Checkout real code
         run: |
           git clone --branch ${{ github.event.inputs.branch }} --single-branch \
             ${{ secrets.PRIVATE_REPO_FULL_NAME }} real-code
@@ -113,7 +115,8 @@ jobs:
           name: gym-log
           path: "/Users/runner/Library/Logs/gym/TemoorstAppDevelopment-TemoorstApp Development Release.log"
 
-      - &notify-on-failure name: Notify on failure
+      - &notify-on-failure
+        name: Notify on failure
         if: failure()
         run: |
           ERROR_MSG="Build failed in job ${{ github.job }} on ref ${{ github.ref }} (run #${{ github.run_number }})"

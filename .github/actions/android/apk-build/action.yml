@@ -1,27 +1,18 @@
-name: iOS Build AdHoc
+name: Android Build APK
 
-on:
-  workflow_call:
-    inputs:
-      branch:
-        required: true
-        type: string
-      environment:
-        required: true
-        type: string
+inputs:
+  branch:
+    required: true
+    type: string
+  environment:
+    required: true
+    type: string
 
 jobs:
-  ios-adhoc:
-    name: iOS AdHoc Build
-    runs-on: macos-15
-    timeout-minutes: 30
+  build-apk:
+    name: Android build APK
+    runs-on: ubuntu-latest
     steps:
-      - name: Create fastlane keychain
-        run: |
-          security create-keychain -p "" fastlane.keychain
-          security default-keychain -s fastlane.keychain
-          security unlock-keychain -p "" fastlane.keychain
-
       - name: Setup SSH for private repo
         run: |
           mkdir -p ~/.ssh
@@ -32,12 +23,22 @@ jobs:
           ssh-keyscan -p 2222 ${{ secrets.PRIVATE_HOST }} >> ~/.ssh/known_hosts
           printf "Host %s\n  HostName %s\n  Port 2222\n  IdentityFile ~/.ssh/id_rsa\n" \
             "${{ secrets.PRIVATE_HOST }}" "${{ secrets.PRIVATE_HOST }}" > ~/.ssh/config
-            
-      # Checkout the actual application code
+
       - name: Checkout real code
         run: |
           git clone --branch ${{ github.event.inputs.branch }} --single-branch \
             ${{ secrets.PRIVATE_REPO_FULL_NAME }} real-code
+
+      - name: Cache Yarn dependencies
+        uses: actions/cache@v4
+        with:
+          path: real-code/node_modules
+          key: ${{ runner.os }}-yarn-${{ hashFiles('real-code/yarn.lock') }}
+          restore-keys: |
+            ${{ runner.os }}-yarn-
+
+      - name: Install JS dependencies
+        run: yarn --cwd real-code install  --silent
 
       - name: Cache Yarn dependencies
         uses: actions/cache@v4
@@ -49,42 +50,7 @@ jobs:
           restore-keys: |
             yarn-
 
-      - name: Install JS dependencies
-        run: yarn --cwd real-code install  --silent
-
-      - name: Setup Ruby & Fastlane
-        uses: ruby/setup-ruby@v1
-        with:
-          ruby-version: "3.4.4"
-      - name: Cache Ruby gems
-        uses: actions/cache@v4
-        with:
-          path: real-code/fastlane/vendor/bundle
-          key: ${{ runner.os }}-gem-cache-${{ hashFiles('real-code/fastlane/Gemfile.lock') }}
-          restore-keys: |
-            ${{ runner.os }}-gem-cache-
-      - name: Install Bundler
-        working-directory: real-code/fastlane
-        run: |
-          gem install bundler
-          bundle config set path 'vendor/bundle'
-          bundle install --jobs 4 --retry 3
-
-      - name: Cache CocoaPods
-        uses: actions/cache@v4
-        with:
-          path: |
-            real-code/ios/Pods
-            ~/.cocoapods/repos
-          key: ${{ runner.os }}-pods-${{ hashFiles('real-code/ios/Podfile.lock') }}
-          restore-keys: |
-            ${{ runner.os }}-pods-
-
-      - name: iOS Pod install
-        working-directory: real-code/ios
-        run: pod install --repo-update --silent
-
-      - name: Build & AdHoc via Fastlane
+      - name: Build APK via Fastlane
         working-directory: real-code/fastlane
         env:
           FASTLANE_USER: ${{ secrets.FASTLANE_USER }}
@@ -99,14 +65,7 @@ jobs:
           BUILD_BRANCH: ${{ github.event.inputs.branch }}
           DRIVER_KEY_JSON: ${{ secrets.DRIVER_KEY_JSON }}
           FASTLANE_DISABLE_UPDATE_CHECK: true
-        run: bundle exec fastlane ios adhoc env:${{ github.event.inputs.environment }}
-
-      - name: Upload Gym log as artifact
-        if: failure()
-        uses: actions/upload-artifact@v4
-        with:
-          name: gym-log
-          path: "/Users/runner/Library/Logs/gym/TemoorstAppDevelopment-TemoorstApp Development Release.log"
+        run: bundle exec fastlane android apk env:${{ github.event.inputs.environment }}
 
       - name: Notify on failure
         if: failure()

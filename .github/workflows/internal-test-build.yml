@@ -14,13 +14,13 @@ on:
 
 jobs:
   ios-adhoc:
-    uses: ./.github/workflows/ios/adhoc-build.yml
+    uses: ./.github/actions/ios/adhoc-build
     with:
       branch: ${{ inputs.branch }}
       environment: ${{ inputs.environment }}
 
   android-apk:
-    uses: ./.github/workflows/android/apk-build.yml
+    uses: ./.github/actions/android/apk-build
     with:
       branch: ${{ inputs.branch }}
       environment: ${{ inputs.environment }}

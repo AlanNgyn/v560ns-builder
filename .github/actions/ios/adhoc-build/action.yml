@@ -1,0 +1,113 @@
+name: iOS Build AdHoc
+
+inputs:
+  branch:
+    required: true
+    type: string
+  environment:
+    required: true
+    type: string
+
+runs:
+  using: "composite"
+  steps:
+    - name: Create fastlane keychain
+      run: |
+        security create-keychain -p "" fastlane.keychain
+        security default-keychain -s fastlane.keychain
+        security unlock-keychain -p "" fastlane.keychain
+
+    - name: Setup SSH for private repo
+      run: |
+        mkdir -p ~/.ssh
+        cat << 'EOF' > ~/.ssh/id_rsa
+        $SSH_PRIVATE_KEY
+        EOF
+        chmod 600 ~/.ssh/id_rsa
+        ssh-keyscan -p 2222 $PRIVATE_HOST >> ~/.ssh/known_hosts
+        printf "Host %s\n  HostName %s\n  Port 2222\n  IdentityFile ~/.ssh/id_rsa\n" \
+          "$PRIVATE_HOST" "$PRIVATE_HOST" > ~/.ssh/config
+        
+    # Checkout the actual application code
+    - name: Checkout real code
+      run: |
+        git clone --branch ${{ github.event.inputs.branch }} --single-branch \
+          $PRIVATE_REPO_FULL_NAME real-code
+
+    - name: Cache Yarn dependencies
+      uses: actions/cache@v4
+      with:
+        path: |
+          real-code/node_modules
+          ~/.cache/yarn
+        key: yarn-${{ hashFiles('real-code/yarn.lock') }}
+        restore-keys: |
+          yarn-
+
+    - name: Install JS dependencies
+      run: yarn --cwd real-code install  --silent
+
+    - name: Setup Ruby & Fastlane
+      uses: ruby/setup-ruby@v1
+      with:
+        ruby-version: "3.4.4"
+    - name: Cache Ruby gems
+      uses: actions/cache@v4
+      with:
+        path: real-code/fastlane/vendor/bundle
+        key: ${{ runner.os }}-gem-cache-${{ hashFiles('real-code/fastlane/Gemfile.lock') }}
+        restore-keys: |
+          ${{ runner.os }}-gem-cache-
+    - name: Install Bundler
+      working-directory: real-code/fastlane
+      run: |
+        gem install bundler
+        bundle config set path 'vendor/bundle'
+        bundle install --jobs 4 --retry 3
+
+    - name: Cache CocoaPods
+      uses: actions/cache@v4
+      with:
+        path: |
+          real-code/ios/Pods
+          ~/.cocoapods/repos
+        key: ${{ runner.os }}-pods-${{ hashFiles('real-code/ios/Podfile.lock') }}
+        restore-keys: |
+          ${{ runner.os }}-pods-
+
+    - name: iOS Pod install
+      working-directory: real-code/ios
+      run: pod install --repo-update --silent
+
+    - name: Build & AdHoc via Fastlane
+      working-directory: real-code/fastlane
+      env:
+        FASTLANE_USER: $FASTLANE_USER
+        MATCH_GIT_URL: $MATCH_GIT_URL
+        MATCH_PASSWORD: $MATCH_PASSWORD
+        TEAM_ID: $TEAM_ID
+        BUNDLE_ID_STAGING: $BUNDLE_ID_STAGING
+        BUNDLE_ID_LIVE: $BUNDLE_ID_LIVE
+        DIAWI_API_TOKEN: $DIAWI_API_TOKEN
+        GG_DRIVE_FOLDER_ID: $GG_DRIVE_FOLDER_ID
+        PROJECT_NAME: $PROJECT_NAME
+        DRIVER_KEY_JSON: $DRIVER_KEY_JSON
+        BUILD_BRANCH: ${{ github.event.inputs.branch }}
+        FASTLANE_DISABLE_UPDATE_CHECK: true
+      run: bundle exec fastlane ios adhoc env:${{ github.event.inputs.environment }}
+
+    - name: Upload Gym log as artifact
+      if: failure()
+      uses: actions/upload-artifact@v4
+      with:
+        name: gym-log
+        path: "/Users/runner/Library/Logs/gym/TemoorstAppDevelopment-TemoorstApp Development Release.log"
+
+    - name: Notify on failure
+      if: failure()
+      run: |
+        ERROR_MSG="Build failed in job ${{ github.job }} on ref ${{ github.ref }} (run #${{ github.run_number }})"
+        # replace the curl command below with your notification endpoint
+        curl -X POST -H 'Content-Type: application/json' \
+          -d "{\"project\":\"$PROJECT_NAME\" ,\"message\":\"${ERROR_MSG}\", \"status\": 1 , \"link\": \"\" }" \
+          "$NOTIFICATION_WEBHOOK_URL"

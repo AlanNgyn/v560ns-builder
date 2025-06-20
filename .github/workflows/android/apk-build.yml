@@ -34,23 +34,15 @@ jobs:
       - name: Cache Yarn dependencies
         uses: actions/cache@v4
         with:
-          path: real-code/node_modules
-          key: ${{ runner.os }}-yarn-${{ hashFiles('real-code/yarn.lock') }}
-          restore-keys: |
-            ${{ runner.os }}-yarn-
-
-      - name: Install JS dependencies
-        run: yarn --cwd real-code install  --silent
-
-      - name: Cache Yarn dependencies
-        uses: actions/cache@v4
-        with:
           path: |
             real-code/node_module
             ~/.cache/yarn
           key: yarn-${{ hashFiles('real-code/yarn.lock') }}
           restore-keys: |
             yarn-
+
+      - name: Install JS dependencies
+        run: yarn --cwd real-code install  --silent
 
       - name: Build APK via Fastlane
         working-directory: real-code/fastlane

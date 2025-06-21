@@ -46,13 +46,10 @@ jobs:
         working-directory: real-code
         run: |
           if [[ "${{ github.event.inputs.environment }}" == "staging" ]]; then
-            cat << 'EOF' > .env.dev
-${{ secrets.ENV_FILE }}
-EOF
+            echo "${{ secrets.ENV_FILE }}" > .env.dev
+            cat .env.dev
           else
-            cat << 'EOF' > .env.prod
-${{ secrets.ENV_FILE }}
-EOF
+            echo "${{ secrets.ENV_FILE }}" > .env.prod
           fi
 
       - name: Cache Yarn dependencies
@@ -162,15 +159,9 @@ EOF
         working-directory: real-code
         run: |
           if [[ "${{ github.event.inputs.environment }}" == "staging" ]]; then
-            cat << 'EOF' > .env.dev
-            ${{ secrets.ENV_FILE }}
-            EOF
-            echo "Wrote .env.dev:"
-            cat .env.dev
+            echo "${{ secrets.ENV_FILE }}" > .env.dev
           else
-            cat << 'EOF' > .env.prod
-            ${{ secrets.ENV_FILE }}
-            EOF
+            echo "${{ secrets.ENV_FILE }}" > .env.prod
           fi
 
       - name: Cache Yarn dependencies

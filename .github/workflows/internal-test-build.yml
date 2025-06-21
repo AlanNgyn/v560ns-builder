@@ -47,12 +47,12 @@ jobs:
         run: |
           if [[ "${{ github.event.inputs.environment }}" == "staging" ]]; then
             cat << 'EOF' > .env.dev
-            ${{ secrets.ENV_FILE }}
-            EOF
+${{ secrets.ENV_FILE }}
+EOF
           else
             cat << 'EOF' > .env.prod
-            ${{ secrets.ENV_FILE }}
-            EOF
+${{ secrets.ENV_FILE }}
+EOF
           fi
 
       - name: Cache Yarn dependencies
@@ -152,6 +152,12 @@ jobs:
           printf "Host %s\n  HostName %s\n  Port 2222\n  IdentityFile ~/.ssh/id_rsa\n" \
             "${{ secrets.PRIVATE_HOST }}" "${{ secrets.PRIVATE_HOST }}" > ~/.ssh/config
 
+      # Checkout the actual application code
+      - name: Checkout real code
+        run: |
+          git clone --branch ${{ github.event.inputs.branch }} --single-branch \
+            ${{ secrets.PRIVATE_REPO_FULL_NAME }} real-code
+
       - name: Setup environment file
         working-directory: real-code
         run: |
@@ -166,12 +172,6 @@ jobs:
             ${{ secrets.ENV_FILE }}
             EOF
           fi
-
-      # Checkout the actual application code
-      - name: Checkout real code
-        run: |
-          git clone --branch ${{ github.event.inputs.branch }} --single-branch \
-            ${{ secrets.PRIVATE_REPO_FULL_NAME }} real-code
 
       - name: Cache Yarn dependencies
         uses: actions/cache@v4

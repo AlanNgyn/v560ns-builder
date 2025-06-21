@@ -15,6 +15,7 @@ on:
 jobs:
   ios-adhoc:
     name: iOS AdHoc Build
+    environment: ${{ github.event.inputs.environment }}
     runs-on: macos-15
     timeout-minutes: 30
     steps:
@@ -40,6 +41,19 @@ jobs:
         run: |
           git clone --branch ${{ github.event.inputs.branch }} --single-branch \
             ${{ secrets.PRIVATE_REPO_FULL_NAME }} real-code
+
+      - name: Setup environment file
+        shell: bash
+        run: |
+          if [[ "${{ github.event.inputs.environment }}" == "staging" ]]; then
+            cat << 'EOF' > .env.dev
+            ${{ secrets.ENV_FILE }}
+            EOF
+          else
+            cat << 'EOF' > .env.prod
+            ${{ secrets.ENV_FILE }}
+            EOF
+          fi
 
       - name: Cache Yarn dependencies
         uses: actions/cache@v4
@@ -99,8 +113,8 @@ jobs:
           BUNDLE_ID_STAGING: ${{ secrets.BUNDLE_ID_STAGING }}
           BUNDLE_ID_LIVE: ${{ secrets.BUNDLE_ID_LIVE }}
           DIAWI_API_TOKEN: ${{ secrets.DIAWI_API_TOKEN }}
-          GG_DRIVE_FOLDER_ID: ${{ secrets.GG_DRIVE_FOLDER_ID }}
-          PROJECT_NAME: ${{ secrets.PROJECT_NAME }}
+          GG_DRIVE_FOLDER_ID: ${{ vars.GG_DRIVE_FOLDER_ID }}
+          PROJECT_NAME: ${{ var.PROJECT_NAME }}
           BUILD_BRANCH: ${{ github.event.inputs.branch }}
           DRIVER_KEY_JSON: ${{ secrets.DRIVER_KEY_JSON }}
           FASTLANE_DISABLE_UPDATE_CHECK: true
@@ -119,12 +133,13 @@ jobs:
           ERROR_MSG="Build failed in job ${{ github.job }} on ref ${{ github.ref }} (run #${{ github.run_number }})"
           # replace the curl command below with your notification endpoint
           curl -X POST -H 'Content-Type: application/json' \
-            -d "{\"project\":\"${{ secrets.PROJECT_NAME }}\" ,\"message\":\"${ERROR_MSG}\", \"status\": 1 , \"link\": \"\" }" \
+            -d "{\"project\":\"${{ vars.PROJECT_NAME }}\" ,\"message\":\"${ERROR_MSG}\", \"status\": 1 , \"link\": \"\" }" \
             "${{ secrets.NOTIFICATION_WEBHOOK_URL }}"
 
   build-apk:
     name: Android build APK
     runs-on: ubuntu-latest
+    environment: ${{ github.event.inputs.environment }}
     steps:
       - name: Setup SSH for private repo
         run: |
@@ -136,7 +151,22 @@ jobs:
           ssh-keyscan -p 2222 ${{ secrets.PRIVATE_HOST }} >> ~/.ssh/known_hosts
           printf "Host %s\n  HostName %s\n  Port 2222\n  IdentityFile ~/.ssh/id_rsa\n" \
             "${{ secrets.PRIVATE_HOST }}" "${{ secrets.PRIVATE_HOST }}" > ~/.ssh/config
-            
+
+      - name: Setup environment file
+        shell: bash
+        run: |
+          if [[ "${{ github.event.inputs.environment }}" == "staging" ]]; then
+            cat << 'EOF' > .env.dev
+            ${{ secrets.ENV_FILE }}
+            EOF
+            echo "Wrote .env.dev:"
+            cat .env.dev
+          else
+            cat << 'EOF' > .env.prod
+            ${{ secrets.ENV_FILE }}
+            EOF
+          fi
+
       # Checkout the actual application code
       - name: Checkout real code
         run: |
@@ -198,8 +228,8 @@ jobs:
           BUNDLE_ID_STAGING: ${{ secrets.BUNDLE_ID_STAGING }}
           BUNDLE_ID_LIVE: ${{ secrets.BUNDLE_ID_LIVE }}
           DIAWI_API_TOKEN: ${{ secrets.DIAWI_API_TOKEN }}
-          GG_DRIVE_FOLDER_ID: ${{ secrets.GG_DRIVE_FOLDER_ID }}
-          PROJECT_NAME: ${{ secrets.PROJECT_NAME }}
+          GG_DRIVE_FOLDER_ID: ${{ vars.GG_DRIVE_FOLDER_ID }}
+          PROJECT_NAME: ${{ vars.PROJECT_NAME }}
           BUILD_BRANCH: ${{ github.event.inputs.branch }}
           DRIVER_KEY_JSON: ${{ secrets.DRIVER_KEY_JSON }}
           FASTLANE_DISABLE_UPDATE_CHECK: true
@@ -211,5 +241,5 @@ jobs:
           ERROR_MSG="Build failed in job ${{ github.job }} on ref ${{ github.ref }} (run #${{ github.run_number }})"
           # replace the curl command below with your notification endpoint
           curl -X POST -H 'Content-Type: application/json' \
-            -d "{\"project\":\"${{ secrets.PROJECT_NAME }}\" ,\"message\":\"${ERROR_MSG}\", \"status\": 1 , \"link\": \"\" }" \
+            -d "{\"project\":\"${{ vars.PROJECT_NAME }}\" ,\"message\":\"${ERROR_MSG}\", \"status\": 1 , \"link\": \"\" }" \
             "${{ secrets.NOTIFICATION_WEBHOOK_URL }}"

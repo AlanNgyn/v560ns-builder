@@ -47,7 +47,6 @@ jobs:
         run: |
           if [[ "${{ github.event.inputs.environment }}" == "staging" ]]; then
             echo "${{ secrets.ENV_FILE }}" > .env.dev
-            cat .env.dev
           else
             echo "${{ secrets.ENV_FILE }}" > .env.prod
           fi

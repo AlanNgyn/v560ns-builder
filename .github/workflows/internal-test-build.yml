@@ -21,9 +21,8 @@ jobs:
     steps:
       - name: Create fastlane keychain
         run: |
-          security create-keychain -p "" fastlane.keychain
-          security default-keychain -s fastlane.keychain
-          security unlock-keychain -p "" fastlane.keychain
+          security create-keychain -p "" ${{ secrets.KEYCHAIN_NAME }}
+          security default-keychain -s ${{ secrets.KEYCHAIN_NAME }}
 
       - name: Setup SSH for private repo
         run: |
@@ -102,6 +101,8 @@ jobs:
       - name: Build & AdHoc via Fastlane
         working-directory: real-code/fastlane
         env:
+          KEYCHAIN_NAME: ${{ secrets.KEYCHAIN_NAME }}
+          KEYCHAIN_PWD: ""
           FASTLANE_USER: ${{ secrets.FASTLANE_USER }}
           MATCH_GIT_URL: ${{ secrets.MATCH_GIT_URL }}
           MATCH_PASSWORD: ${{ secrets.MATCH_PASSWORD }}

@@ -231,7 +231,8 @@ jobs:
         shell: bash
         run: |
           ERROR_MSG="Build failed in job ${{ github.job }} on ref ${{ github.ref }} (run #${{ github.run_number }})"
+          RUN_URL="${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}"
           curl -X POST \
             -H 'Content-Type: application/json' \
-            -d '{"project":"'"${{ vars.PROJECT_NAME }}"'","message":"'"${ERROR_MSG}"'","status":1,"link":""}' \
+            -d '{"project":"'"${{ vars.PROJECT_NAME }}"'","message":"'"${ERROR_MSG}"'","status":1,"link":"'"${RUN_URL}"'"}' \
             "${{ secrets.NOTIFICATION_WEBHOOK_URL }}"

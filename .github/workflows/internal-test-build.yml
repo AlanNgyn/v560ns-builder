@@ -64,25 +64,8 @@ jobs:
         shell: bash
         run: yarn --cwd real-code install --silent
 
-      - name: Setup Ruby & Fastlane
-        uses: ruby/setup-ruby@v1
-        with:
-          ruby-version: "3.4.4"
-
-      - name: Cache Ruby gems
-        uses: actions/cache@v4
-        with:
-          path: real-code/fastlane/vendor/bundle
-          key: gem-cache-${{ hashFiles('real-code/fastlane/Gemfile.lock') }}
-          restore-keys: |
-            gem-cache-
-              
-      - name: Install Bundler
-        working-directory: real-code/fastlane
-        run: |
-          gem install bundler
-          bundle config set path 'vendor/bundle'
-          bundle install --jobs 4 --retry 3
+      - name: Prepare mobile build
+        uses: ./.github/actions/prepare-mobile-build
 
       - name: Cache CocoaPods
         uses: actions/cache@v4
@@ -125,15 +108,14 @@ jobs:
           path: "/Users/runner/Library/Logs/gym/TemoorstAppDevelopment-TemoorstApp Development Release.log"
 
       - name: Notify on failure
+        uses: ./.github/actions/notify-on-failure
         if: failure()
-        shell: bash
-        run: |
-          ERROR_MSG="Build failed in job ${{ github.job }} on ref ${{ github.ref }} (run #${{ github.run_number }})"
-          RUN_URL="${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}"
-          curl -X POST \
-            -H 'Content-Type: application/json' \
-            -d '{"project":"'"${{ vars.PROJECT_NAME }}"'","message":"'"${ERROR_MSG}"'","status":1,"link":"'"${RUN_URL}"'"}' \
-            "${{ secrets.NOTIFICATION_WEBHOOK_URL }}"
+        with:
+          project_name: ${{ vars.PROJECT_NAME }}
+          webhook_url: ${{ secrets.NOTIFICATION_WEBHOOK_URL }}
+          job_name: ${{ github.job }}
+          branch: ${{ github.event.inputs.branch }}
+          run_url: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
             
   build-apk:
     name: Android build APK
@@ -180,18 +162,8 @@ jobs:
         shell: bash
         run: yarn --cwd real-code install --silent
 
-      - name: Setup Ruby & Fastlane
-        uses: ruby/setup-ruby@v1
-        with:
-          ruby-version: "3.4.4"
-
-      - name: Cache Ruby gems
-        uses: actions/cache@v4
-        with:
-          path: real-code/fastlane/vendor/bundle
-          key: gem-cache-${{ hashFiles('real-code/fastlane/Gemfile.lock') }}
-          restore-keys: |
-            gem-cache-
+      - name: Prepare mobile build
+        uses: ./.github/actions/prepare-mobile-build
 
       - name: Install Bundler
         working-directory: real-code/fastlane
@@ -229,12 +201,11 @@ jobs:
         run: bundle exec fastlane android apk env:${{ github.event.inputs.environment }}
 
       - name: Notify on failure
+        uses: ./.github/actions/notify-on-failure
         if: failure()
-        shell: bash
-        run: |
-          ERROR_MSG="Build failed in job ${{ github.job }} on ref ${{ github.ref }} (run #${{ github.run_number }})"
-          RUN_URL="${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}"
-          curl -X POST \
-            -H 'Content-Type: application/json' \
-            -d '{"project":"'"${{ vars.PROJECT_NAME }}"'","message":"'"${ERROR_MSG}"'","status":1,"link":"'"${RUN_URL}"'"}' \
-            "${{ secrets.NOTIFICATION_WEBHOOK_URL }}"
+        with:
+          project_name: ${{ vars.PROJECT_NAME }}
+          webhook_url: ${{ secrets.NOTIFICATION_WEBHOOK_URL }}
+          job_name: ${{ github.job }}
+          branch: ${{ github.event.inputs.branch }}
+          run_url: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}

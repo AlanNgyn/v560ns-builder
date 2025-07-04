@@ -19,6 +19,9 @@ jobs:
     runs-on: macos-15
     timeout-minutes: 30
     steps:
+      - name: Checkout current repo
+        uses: actions/checkout@v4
+
       - name: Create fastlane keychain
         run: |
           security create-keychain -p "" ${{ vars.KEYCHAIN_NAME }}
@@ -122,6 +125,9 @@ jobs:
     runs-on: ubuntu-latest
     environment: ${{ github.event.inputs.environment }}
     steps:
+      - name: Checkout current repo
+        uses: actions/checkout@v4
+
       - name: Setup SSH for private repo
         run: |
           mkdir -p ~/.ssh

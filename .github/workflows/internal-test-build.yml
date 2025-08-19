@@ -22,7 +22,7 @@ jobs:
       - name: Set Xcode version
         uses: maxim-lobanov/setup-xcode@v1
         with:
-          xcode-version: '15.2' # Supports iOS 17.0 SDK
+          xcode-version: '16.2.0' # Supports iOS 17.0 SDK
 
       - name: Checkout current repo
         uses: actions/checkout@v4

@@ -19,6 +19,11 @@ jobs:
     runs-on: macos-15
     timeout-minutes: 30
     steps:
+      - name: Set Xcode version
+        uses: maxim-lobanov/setup-xcode@v1
+        with:
+          xcode-version: '15.2' # Supports iOS 17.0 SDK
+
       - name: Checkout current repo
         uses: actions/checkout@v4
 

@@ -22,7 +22,11 @@ jobs:
       - name: Set Xcode version
         uses: maxim-lobanov/setup-xcode@v1
         with:
-          xcode-version: '16.2.0' # Supports iOS 17.0 SDK
+          xcode-version: '16.4'
+
+      # - name: Set Xcode v16.4
+      #   run: |
+      #     sudo xcode-select -switch /Applications/Xcode_16.4.app/Contents/Developer
 
       - name: Checkout current repo
         uses: actions/checkout@v4

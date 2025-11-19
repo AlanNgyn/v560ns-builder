@@ -68,6 +68,7 @@ jobs:
       - name: Setup environment file
         working-directory: real-code
         run: |
+          echo "${{ secrets.ENV_FILE }}" > .env
           if [[ "${{ github.event.inputs.environment }}" == "staging" ]]; then
             echo "${{ secrets.ENV_FILE }}" > .env.dev
           else

@@ -58,8 +58,7 @@ jobs:
       - name: Setup Android keystore
         working-directory: real-code/android/app
         run: |
-          mkdir -p SSP-Android-Key
-          echo "${{ secrets.ANDROID_KEYSTORE_BASE64 }}" | base64 --decode > keystore/upload-keystore.jks
+          echo "${{ secrets.ANDROID_KEYSTORE_BASE64 }}" | base64 --decode > upload-keystore.jks
       - name: Install JS dependencies
         shell: bash
         run: yarn --cwd real-code install --silent
@@ -88,7 +87,7 @@ jobs:
           PROJECT_NAME: ${{ vars.PROJECT_NAME }}
           BUILD_BRANCH: ${{ github.event.inputs.branch }}
           DRIVER_KEY_JSON: ${{ secrets.DRIVER_KEY_JSON }}
-          MYAPP_UPLOAD_STORE_FILE: ${{ github.workspace }}/real-code/android/app/keystore/upload-keystore.jks
+          MYAPP_UPLOAD_STORE_FILE: ${{ github.workspace }}/real-code/android/app/upload-keystore.jks
           MYAPP_UPLOAD_KEY_ALIAS: ${{ secrets.MYAPP_UPLOAD_KEY_ALIAS }}
           MYAPP_UPLOAD_STORE_PASSWORD: ${{ secrets.MYAPP_UPLOAD_STORE_PASSWORD }}
           MYAPP_UPLOAD_KEY_PASSWORD: ${{ secrets.MYAPP_UPLOAD_KEY_PASSWORD }}

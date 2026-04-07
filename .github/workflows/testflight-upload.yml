@@ -1,4 +1,4 @@
-name: Mobile Build Internal Testing
+name: TestFlight Upload
 
 on:
   workflow_dispatch:
@@ -20,20 +20,13 @@ jobs:
   notify-start:
     uses: ./.github/workflows/reusable-notify-start.yml
     with:
-      message: "**[BUILD STARTED]**\\nStarting internal test build for branch **${{ github.event.inputs.branch }}**.\\nPlease wait... :bicyclist: :man-biking: :woman-biking: :wind_blowing_face: "
+      message: "**[TESTFLIGHT UPLOAD STARTED]**\\nStarting TestFlight upload for branch **${{ github.event.inputs.branch }}**.\\nPlease wait... :bicyclist: :man-biking: :woman-biking: :wind_blowing_face: "
     secrets: inherit
 
-  ios-adhoc:
-    uses: ./.github/workflows/reusable-ios-adhoc.yml
+  ios-testflight:
+    uses: ./.github/workflows/reusable-ios-testflight.yml
     with:
       branch: ${{ github.event.inputs.branch }}
       environment: ${{ github.event.inputs.environment }}
       xcode_version: ${{ github.event.inputs.xcode_version }}
-    secrets: inherit
-
-  build-apk:
-    uses: ./.github/workflows/reusable-build-apk.yml
-    with:
-      branch: ${{ github.event.inputs.branch }}
-      environment: ${{ github.event.inputs.environment }}
     secrets: inherit

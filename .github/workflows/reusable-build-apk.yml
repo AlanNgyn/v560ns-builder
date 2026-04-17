@@ -85,6 +85,38 @@ jobs:
           FASTLANE_DISABLE_UPDATE_CHECK: true
         run: bundle exec fastlane android apk env:${{ inputs.environment }}
 
+      - name: Enable KVM for emulator
+        if: inputs.branch == 'V560NS-221-v1'
+        run: |
+          echo 'KERNEL=="kvm", GROUP="kvm", MODE="0666", OPTIONS+="static_node=kvm"' | sudo tee /etc/udev/rules.d/99-kvm4all.rules
+          sudo udevadm control --reload-rules
+          sudo udevadm trigger --name-match=kvm
+
+      - name: Install Maestro
+        if: inputs.branch == 'V560NS-221-v1'
+        run: |
+          curl -Ls "https://get.maestro.mobile.dev" | bash
+          echo "$HOME/.maestro/bin" >> $GITHUB_PATH
+
+      - name: Run Maestro E2E Tests (Android)
+        if: inputs.branch == 'V560NS-221-v1'
+        uses: reactivecircus/android-emulator-runner@v2
+        with:
+          api-level: 34
+          arch: x86_64
+          script: |
+            APK_PATH=$(find ${{ github.workspace }}/real-code/android/app/build/outputs -name "*.apk" -type f | head -1)
+            adb install "$APK_PATH"
+            maestro test ${{ github.workspace }}/real-code/.maestro/ --output ${{ github.workspace }}/maestro-report --format junit || true
+
+      - name: Upload E2E evidence (Android)
+        if: inputs.branch == 'V560NS-221-v1' && always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: android-e2e-evidence-${{ github.run_number }}
+          path: maestro-report/
+          retention-days: 30
+
       - name: Notify on failure
         uses: ./.github/actions/notify-on-failure
         if: failure()

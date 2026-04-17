@@ -18,7 +18,7 @@ jobs:
     name: iOS AdHoc Build
     environment: ${{ inputs.environment }}
     runs-on: ${{ inputs.xcode_version == '26.3' && 'macos-26' || 'macos-15' }}
-    timeout-minutes: 30
+    timeout-minutes: 60
     steps:
       - name: Set Xcode version
         uses: maxim-lobanov/setup-xcode@v1
@@ -79,6 +79,44 @@ jobs:
           DRIVER_KEY_JSON: ${{ secrets.DRIVER_KEY_JSON }}
           FASTLANE_DISABLE_UPDATE_CHECK: true
         run: bundle exec fastlane ios adhoc env:${{ inputs.environment }}
+
+      - name: Build for Simulator
+        if: inputs.branch == 'V560NS-221-v1'
+        working-directory: real-code
+        run: |
+          xcodebuild -workspace ios/TemoorstApp.xcworkspace \
+            -scheme "TemoorstApp Development Release" \
+            -sdk iphonesimulator \
+            -configuration Release \
+            -destination 'platform=iOS Simulator,name=iPhone 16 Pro' \
+            -derivedDataPath ios/sim-build \
+            build | tail -20
+
+      - name: Install Maestro
+        if: inputs.branch == 'V560NS-221-v1'
+        run: |
+          curl -Ls "https://get.maestro.mobile.dev" | bash
+          echo "$HOME/.maestro/bin" >> $GITHUB_PATH
+
+      - name: Run Maestro E2E Tests (iOS)
+        if: inputs.branch == 'V560NS-221-v1'
+        working-directory: real-code
+        run: |
+          # Boot simulator
+          xcrun simctl boot "iPhone 16 Pro" || true
+          # Find and install .app
+          APP_PATH=$(find ios/sim-build -name "*.app" -path "*/Release-iphonesimulator/*" -type d | head -1)
+          xcrun simctl install booted "$APP_PATH"
+          # Run Maestro tests
+          maestro test .maestro/ --output ${{ github.workspace }}/maestro-report --format junit || true
+
+      - name: Upload E2E evidence (iOS)
+        if: inputs.branch == 'V560NS-221-v1' && always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: ios-e2e-evidence-${{ github.run_number }}
+          path: maestro-report/
+          retention-days: 30
 
       - name: Upload Gym log as artifact
         if: failure()

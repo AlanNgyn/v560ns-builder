@@ -98,15 +98,31 @@ jobs:
           curl -Ls "https://get.maestro.mobile.dev" | bash
           echo "$HOME/.maestro/bin" >> $GITHUB_PATH
 
+      - name: Prepare Maestro report directory
+        if: inputs.branch == 'V560NS-221-v1'
+        run: mkdir -p ${{ github.workspace }}/maestro-report/videos ${{ github.workspace }}/maestro-report/screenshots
+
+      - name: List available simulators
+        if: inputs.branch == 'V560NS-221-v1'
+        run: xcrun simctl list devices available
+
       - name: Run Maestro E2E Tests (iOS)
         if: inputs.branch == 'V560NS-221-v1'
         working-directory: real-code
         run: |
-          REPORT_DIR="${{ github.workspace }}/maestro-report"
-          mkdir -p "$REPORT_DIR/videos" "$REPORT_DIR/screenshots"
-
-          # Boot simulator
-          xcrun simctl boot "iPhone 16 Pro" || true
+          # Boot first available iPhone simulator
+          DEVICE_ID=$(xcrun simctl list devices available -j | python3 -c "
+          import json, sys
+          data = json.load(sys.stdin)
+          for runtime, devices in data['devices'].items():
+            if 'iOS' in runtime or 'iphone' in runtime.lower():
+              for d in devices:
+                if 'iPhone' in d['name']:
+                  print(d['udid'])
+                  sys.exit(0)
+          " 2>/dev/null)
+          echo "Booting device: $DEVICE_ID"
+          xcrun simctl boot "$DEVICE_ID" || true
 
           # Find and install .app
           APP_PATH=$(find ios/sim-build -name "*.app" -path "*/Release-iphonesimulator/*" -type d | head -1)
@@ -117,11 +133,11 @@ jobs:
             [ "$(basename "$flow")" = "config.yaml" ] && continue
             FLOW_NAME=$(basename "$flow" .yaml)
             echo "=== Running: $FLOW_NAME ==="
-            maestro record "$flow" --output "$REPORT_DIR/videos/${FLOW_NAME}.mp4" || true
+            maestro record "$flow" --output "${{ github.workspace }}/maestro-report/videos/${FLOW_NAME}.mp4" || true
           done
 
           # Move screenshots to report dir
-          find .maestro -name "*.png" -exec mv {} "$REPORT_DIR/screenshots/" \; 2>/dev/null || true
+          find .maestro -name "*.png" -exec mv {} "${{ github.workspace }}/maestro-report/screenshots/" \; 2>/dev/null || true
 
       - name: Upload E2E evidence (iOS)
         if: inputs.branch == 'V560NS-221-v1' && always()

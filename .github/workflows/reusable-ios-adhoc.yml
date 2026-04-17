@@ -102,13 +102,26 @@ jobs:
         if: inputs.branch == 'V560NS-221-v1'
         working-directory: real-code
         run: |
+          REPORT_DIR="${{ github.workspace }}/maestro-report"
+          mkdir -p "$REPORT_DIR/videos" "$REPORT_DIR/screenshots"
+
           # Boot simulator
           xcrun simctl boot "iPhone 16 Pro" || true
+
           # Find and install .app
           APP_PATH=$(find ios/sim-build -name "*.app" -path "*/Release-iphonesimulator/*" -type d | head -1)
           xcrun simctl install booted "$APP_PATH"
-          # Run Maestro tests
-          maestro test .maestro/ --output ${{ github.workspace }}/maestro-report --format junit || true
+
+          # Record video for each flow
+          for flow in .maestro/*.yaml; do
+            [ "$(basename "$flow")" = "config.yaml" ] && continue
+            FLOW_NAME=$(basename "$flow" .yaml)
+            echo "=== Running: $FLOW_NAME ==="
+            maestro record "$flow" --output "$REPORT_DIR/videos/${FLOW_NAME}.mp4" || true
+          done
+
+          # Move screenshots to report dir
+          find .maestro -name "*.png" -exec mv {} "$REPORT_DIR/screenshots/" \; 2>/dev/null || true
 
       - name: Upload E2E evidence (iOS)
         if: inputs.branch == 'V560NS-221-v1' && always()

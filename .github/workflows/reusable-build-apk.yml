@@ -105,9 +105,25 @@ jobs:
           api-level: 34
           arch: x86_64
           script: |
-            APK_PATH=$(find ${{ github.workspace }}/real-code/android/app/build/outputs -name "*.apk" -type f | head -1)
+            WORKSPACE="${{ github.workspace }}"
+            MAESTRO_DIR="$WORKSPACE/real-code/.maestro"
+            REPORT_DIR="$WORKSPACE/maestro-report"
+            mkdir -p "$REPORT_DIR/videos" "$REPORT_DIR/screenshots"
+
+            APK_PATH=$(find "$WORKSPACE/real-code/android/app/build/outputs" -name "*.apk" -type f | head -1)
             adb install "$APK_PATH"
-            maestro test ${{ github.workspace }}/real-code/.maestro/ --output ${{ github.workspace }}/maestro-report --format junit || true
+
+            # Record video for each flow
+            for flow in "$MAESTRO_DIR"/*.yaml; do
+              [ "$(basename "$flow")" = "config.yaml" ] && continue
+              FLOW_NAME=$(basename "$flow" .yaml)
+              echo "=== Running: $FLOW_NAME ==="
+              maestro record "$flow" --output "$REPORT_DIR/videos/${FLOW_NAME}.mp4" || true
+            done
+
+            # Screenshots are saved by takeScreenshot commands during record
+            # Move any screenshots to report dir
+            find "$MAESTRO_DIR" -name "*.png" -exec mv {} "$REPORT_DIR/screenshots/" \; 2>/dev/null || true
 
       - name: Upload E2E evidence (Android)
         if: inputs.branch == 'V560NS-221-v1' && always()

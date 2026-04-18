@@ -98,9 +98,37 @@ jobs:
           curl -Ls "https://get.maestro.mobile.dev" | bash
           echo "$HOME/.maestro/bin" >> $GITHUB_PATH
 
-      - name: Prepare Maestro report directory
+      - name: Prepare Maestro E2E script
         if: inputs.branch == 'V560NS-221-v1'
-        run: mkdir -p ${{ github.workspace }}/maestro-report/videos ${{ github.workspace }}/maestro-report/screenshots
+        run: |
+          mkdir -p ${{ github.workspace }}/maestro-report/videos ${{ github.workspace }}/maestro-report/screenshots
+          cat > ${{ github.workspace }}/run-maestro.sh << 'SCRIPT'
+          #!/bin/bash
+          set -x
+          WORKSPACE="$1"
+          REPORT_DIR="$WORKSPACE/maestro-report"
+          MAESTRO_DIR="$WORKSPACE/real-code/.maestro"
+
+          echo "=== Searching for APK ==="
+          find "$WORKSPACE/real-code" -name "*.apk" -type f 2>/dev/null
+          APK_PATH=$(find "$WORKSPACE/real-code" -name "*.apk" -type f | head -1)
+          if [ -z "$APK_PATH" ]; then
+            echo "ERROR: No APK found!"
+            exit 1
+          fi
+          echo "Installing APK: $APK_PATH"
+          adb install "$APK_PATH"
+
+          for flow in "$MAESTRO_DIR"/*.yaml; do
+            [ "$(basename "$flow")" = "config.yaml" ] && continue
+            FLOW_NAME=$(basename "$flow" .yaml)
+            echo "=== Running: $FLOW_NAME ==="
+            maestro record "$flow" --output "$REPORT_DIR/videos/${FLOW_NAME}.mp4" || true
+          done
+
+          find "$MAESTRO_DIR" -name "*.png" -exec mv {} "$REPORT_DIR/screenshots/" \; 2>/dev/null || true
+          SCRIPT
+          chmod +x ${{ github.workspace }}/run-maestro.sh
 
       - name: Run Maestro E2E Tests (Android)
         if: inputs.branch == 'V560NS-221-v1'
@@ -108,11 +136,7 @@ jobs:
         with:
           api-level: 34
           arch: x86_64
-          script: |
-            APK_PATH=$(find ${{ github.workspace }}/real-code/android/app/build/outputs -name "*.apk" -type f | head -1)
-            adb install "$APK_PATH"
-            for flow in ${{ github.workspace }}/real-code/.maestro/*.yaml; do [ "$(basename "$flow")" = "config.yaml" ] && continue; FLOW_NAME=$(basename "$flow" .yaml); echo "=== Running: $FLOW_NAME ==="; maestro record "$flow" --output "${{ github.workspace }}/maestro-report/videos/${FLOW_NAME}.mp4" || true; done
-            find ${{ github.workspace }}/real-code/.maestro -name "*.png" -exec mv {} ${{ github.workspace }}/maestro-report/screenshots/ \; 2>/dev/null || true
+          script: bash ${{ github.workspace }}/run-maestro.sh ${{ github.workspace }}
 
       - name: Upload E2E evidence (Android)
         if: inputs.branch == 'V560NS-221-v1' && always()

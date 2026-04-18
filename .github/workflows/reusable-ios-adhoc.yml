@@ -88,9 +88,11 @@ jobs:
             -scheme "TemoorstApp Development Release" \
             -sdk iphonesimulator \
             -configuration Release \
-            -destination 'platform=iOS Simulator,name=iPhone 16 Pro' \
+            -destination 'generic/platform=iOS Simulator' \
             -derivedDataPath ios/sim-build \
             build | tail -20
+          echo "=== Searching for .app ==="
+          find ios/sim-build -name "*.app" -type d
 
       - name: Install Maestro
         if: inputs.branch == 'V560NS-221-v1'
@@ -125,7 +127,12 @@ jobs:
           xcrun simctl boot "$DEVICE_ID" || true
 
           # Find and install .app
-          APP_PATH=$(find ios/sim-build -name "*.app" -path "*/Release-iphonesimulator/*" -type d | head -1)
+          APP_PATH=$(find ios/sim-build -name "*.app" -type d | grep -v "\.app/" | head -1)
+          echo "Found app: $APP_PATH"
+          if [ -z "$APP_PATH" ]; then
+            echo "ERROR: No .app found!"
+            exit 1
+          fi
           xcrun simctl install booted "$APP_PATH"
 
           # Record video for each flow

@@ -123,7 +123,7 @@ jobs:
             [ "$(basename "$flow")" = "config.yaml" ] && continue
             FLOW_NAME=$(basename "$flow" .yaml)
             echo "=== Running: $FLOW_NAME ==="
-            maestro record "$flow" --output "$REPORT_DIR/videos/${FLOW_NAME}.mp4" || true
+            maestro record --local "$flow" "$REPORT_DIR/videos/${FLOW_NAME}.mp4" || true
           done
 
           find "$MAESTRO_DIR" -name "*.png" -exec mv {} "$REPORT_DIR/screenshots/" \; 2>/dev/null || true

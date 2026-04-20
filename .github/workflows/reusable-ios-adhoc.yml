@@ -140,7 +140,7 @@ jobs:
             [ "$(basename "$flow")" = "config.yaml" ] && continue
             FLOW_NAME=$(basename "$flow" .yaml)
             echo "=== Running: $FLOW_NAME ==="
-            maestro record "$flow" --output "${{ github.workspace }}/maestro-report/videos/${FLOW_NAME}.mp4" || true
+            maestro record --local "$flow" "${{ github.workspace }}/maestro-report/videos/${FLOW_NAME}.mp4" || true
           done
 
           # Move screenshots to report dir

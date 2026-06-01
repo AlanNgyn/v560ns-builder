@@ -81,7 +81,7 @@ jobs:
         run: bundle exec fastlane ios adhoc env:${{ inputs.environment }}
 
       - name: Build for Simulator
-        if: inputs.branch == 'V560NS-221-v1'
+        if: inputs.branch == 'V560NS-v1'
         working-directory: real-code
         run: |
           xcodebuild -workspace ios/TemoorstApp.xcworkspace \
@@ -95,21 +95,21 @@ jobs:
           find ios/sim-build -name "*.app" -type d
 
       - name: Install Maestro
-        if: inputs.branch == 'V560NS-221-v1'
+        if: inputs.branch == 'V560NS-v1'
         run: |
           curl -Ls "https://get.maestro.mobile.dev" | bash
           echo "$HOME/.maestro/bin" >> $GITHUB_PATH
 
       - name: Prepare Maestro report directory
-        if: inputs.branch == 'V560NS-221-v1'
+        if: inputs.branch == 'V560NS-v1'
         run: mkdir -p ${{ github.workspace }}/maestro-report/videos ${{ github.workspace }}/maestro-report/screenshots
 
       - name: List available simulators
-        if: inputs.branch == 'V560NS-221-v1'
+        if: inputs.branch == 'V560NS-v1'
         run: xcrun simctl list devices available
 
       - name: Run Maestro E2E Tests (iOS)
-        if: inputs.branch == 'V560NS-221-v1'
+        if: inputs.branch == 'V560NS-v1'
         working-directory: real-code
         run: |
           # Boot first available iPhone simulator
@@ -147,7 +147,7 @@ jobs:
           find .maestro -name "*.png" -exec mv {} "${{ github.workspace }}/maestro-report/screenshots/" \; 2>/dev/null || true
 
       - name: Upload E2E evidence (iOS)
-        if: inputs.branch == 'V560NS-221-v1' && always()
+        if: inputs.branch == 'V560NS-v1' && always()
         uses: actions/upload-artifact@v4
         with:
           name: ios-e2e-evidence-${{ github.run_number }}

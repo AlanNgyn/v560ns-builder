@@ -86,20 +86,20 @@ jobs:
         run: bundle exec fastlane android apk env:${{ inputs.environment }}
 
       - name: Enable KVM for emulator
-        if: inputs.branch == 'V560NS-221-v1'
+        if: inputs.branch == 'V560NS-v1'
         run: |
           echo 'KERNEL=="kvm", GROUP="kvm", MODE="0666", OPTIONS+="static_node=kvm"' | sudo tee /etc/udev/rules.d/99-kvm4all.rules
           sudo udevadm control --reload-rules
           sudo udevadm trigger --name-match=kvm
 
       - name: Install Maestro
-        if: inputs.branch == 'V560NS-221-v1'
+        if: inputs.branch == 'V560NS-v1'
         run: |
           curl -Ls "https://get.maestro.mobile.dev" | bash
           echo "$HOME/.maestro/bin" >> $GITHUB_PATH
 
       - name: Prepare Maestro E2E script
-        if: inputs.branch == 'V560NS-221-v1'
+        if: inputs.branch == 'V560NS-v1'
         run: |
           mkdir -p ${{ github.workspace }}/maestro-report/videos ${{ github.workspace }}/maestro-report/screenshots
           cat > ${{ github.workspace }}/run-maestro.sh << 'SCRIPT'
@@ -119,6 +119,17 @@ jobs:
           echo "Installing APK: $APK_PATH"
           adb install "$APK_PATH"
 
+          # Get actual package name from installed APK (Android uses .dev, iOS uses .stg)
+          PKG_NAME=$(aapt dump badging "$APK_PATH" | grep -oP "package: name='\K[^']+")
+          echo "Detected package: $PKG_NAME"
+
+          # Rewrite appId in all Maestro flows to match installed package
+          sed -i "s/^appId:.*/appId: $PKG_NAME/" "$MAESTRO_DIR"/*.yaml
+          grep -H "^appId:" "$MAESTRO_DIR"/*.yaml || true
+
+          # Verify app is installed
+          adb shell pm list packages | grep -i temoorst || echo "WARN: package not found in device"
+
           for flow in "$MAESTRO_DIR"/*.yaml; do
             [ "$(basename "$flow")" = "config.yaml" ] && continue
             FLOW_NAME=$(basename "$flow" .yaml)
@@ -131,7 +142,7 @@ jobs:
           chmod +x ${{ github.workspace }}/run-maestro.sh
 
       - name: Run Maestro E2E Tests (Android)
-        if: inputs.branch == 'V560NS-221-v1'
+        if: inputs.branch == 'V560NS-v1'
         uses: reactivecircus/android-emulator-runner@v2
         with:
           api-level: 34
@@ -139,7 +150,7 @@ jobs:
           script: bash ${{ github.workspace }}/run-maestro.sh ${{ github.workspace }}
 
       - name: Upload E2E evidence (Android)
-        if: inputs.branch == 'V560NS-221-v1' && always()
+        if: inputs.branch == 'V560NS-v1' && always()
         uses: actions/upload-artifact@v4
         with:
           name: android-e2e-evidence-${{ github.run_number }}

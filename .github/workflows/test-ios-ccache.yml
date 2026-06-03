@@ -1,0 +1,144 @@
+name: Test iOS ccache (no notify)
+
+# Standalone workflow to iterate on the ccache setup WITHOUT touching the team group:
+# - no notify-start job, no Mattermost message, no Drive/Diawi upload (it never calls a
+#   Fastlane lane), no signing/match.
+# - compiles natives for the simulator with SKIP_BUNDLING (ccache only caches the native
+#   C/C++/ObjC compiles, so this faithfully tests whether ccache engages — just faster).
+# - the "ccache stats" step dumps ccache -s + the per-invocation log to pinpoint behaviour.
+
+on:
+  workflow_dispatch:
+    inputs:
+      branch:
+        description: "Build Branch"
+        required: true
+        default: "develop"
+      environment:
+        description: "Select environment (staging or live)"
+        required: true
+        default: "staging"
+      xcode_version:
+        description: "Xcode version (16.4 or 26.3)"
+        required: true
+        default: "26.3"
+
+jobs:
+  ios-ccache-test:
+    name: iOS ccache test (build only, no notify)
+    environment: ${{ inputs.environment }}
+    runs-on: ${{ inputs.xcode_version == '26.3' && 'macos-26' || 'macos-15' }}
+    timeout-minutes: 60
+    steps:
+      - name: Set Xcode version
+        uses: maxim-lobanov/setup-xcode@v1
+        with:
+          xcode-version: ${{ inputs.xcode_version }}
+
+      - name: Checkout current repo
+        uses: actions/checkout@v4
+
+      - name: Setup SSH for private repo
+        uses: ./.github/actions/setup-ssh
+        with:
+          ssh_private_key: ${{ secrets.SSH_PRIVATE_KEY }}
+          private_host: ${{ secrets.PRIVATE_HOST }}
+
+      - name: Checkout real code
+        uses: ./.github/actions/checkout-private-repo
+        with:
+          branch: ${{ inputs.branch }}
+          private_repo_full_name: ${{ secrets.PRIVATE_REPO_FULL_NAME }}
+
+      - name: Cache Yarn dependencies
+        uses: actions/cache@v4
+        with:
+          path: |
+            real-code/node_modules
+            ~/.cache/yarn
+          key: yarn-${{ hashFiles('real-code/yarn.lock') }}
+          restore-keys: |
+            yarn-
+
+      - name: Install JS dependencies
+        shell: bash
+        run: yarn --cwd real-code install --silent
+
+      - name: Setup environment file
+        uses: ./.github/actions/setup-env
+        with:
+          environment: ${{ inputs.environment }}
+          passbolt_env_file: ${{ secrets.PASSBOLT_ENV_FILE }}
+          passbolt_private_key: ${{ secrets.PASSBOLT_PRIVATE_KEY }}
+
+      - name: Setup ccache
+        run: |
+          brew list ccache >/dev/null 2>&1 || brew install ccache
+          ccache --version | head -1
+          mkdir -p "$HOME/.cache/ccache"
+          echo "USE_CCACHE=1" >> "$GITHUB_ENV"
+          echo "CCACHE_DIR=$HOME/.cache/ccache" >> "$GITHUB_ENV"
+          echo "CCACHE_MAXSIZE=2G" >> "$GITHUB_ENV"
+          echo "CCACHE_BASEDIR=$GITHUB_WORKSPACE" >> "$GITHUB_ENV"
+          echo "CCACHE_LOGFILE=$HOME/ccache.log" >> "$GITHUB_ENV"
+
+      - name: Restore ccache
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/ccache
+          key: ccache-ios-${{ inputs.xcode_version }}-${{ github.run_id }}
+          restore-keys: |
+            ccache-ios-${{ inputs.xcode_version }}-
+
+      - name: Cache CocoaPods downloads
+        uses: actions/cache@v4
+        with:
+          path: ~/Library/Caches/CocoaPods
+          key: cocoapods-${{ hashFiles('real-code/ios/Podfile.lock') }}
+          restore-keys: |
+            cocoapods-
+
+      - name: iOS Pod install
+        working-directory: real-code/ios
+        env:
+          USE_CCACHE: "1"
+        run: pod install
+
+      - name: Compile natives (simulator, no sign, no JS bundle)
+        working-directory: real-code
+        env:
+          SKIP_BUNDLING: "1"
+        run: |
+          set -o pipefail
+          if [ "${{ inputs.environment }}" = "staging" ]; then
+            SCHEME="TemoorstApp Development Release"
+          else
+            SCHEME="TemoorstApp Production Release"
+          fi
+          echo "Building scheme: $SCHEME"
+          xcodebuild build \
+            -workspace ios/TemoorstApp.xcworkspace \
+            -scheme "$SCHEME" \
+            -configuration Release \
+            -sdk iphonesimulator \
+            -destination 'generic/platform=iOS Simulator' \
+            -derivedDataPath ios/ccache-test-dd \
+            CODE_SIGNING_ALLOWED=NO CODE_SIGNING_REQUIRED=NO \
+            | tail -60
+
+      - name: ccache stats
+        if: always()
+        run: |
+          echo "===== ccache -s ====="
+          ccache -s -v 2>/dev/null || ccache -s
+          echo "===== ccache.log ====="
+          if [ -f "$HOME/ccache.log" ]; then
+            echo "invocations logged: $(grep -c 'Command line' "$HOME/ccache.log" 2>/dev/null || echo '?')"
+            echo "--- Result breakdown ---"
+            grep -oiE 'Result: .*' "$HOME/ccache.log" | sort | uniq -c | sort -rn | head -20
+            echo "--- first 40 lines ---"
+            head -40 "$HOME/ccache.log"
+          else
+            echo "NO ccache.log present → the ccache wrapper was NEVER invoked during the build."
+            echo "→ Xcode 26.3 is not routing compiles through the CC build setting (CC override ignored)."
+          fi

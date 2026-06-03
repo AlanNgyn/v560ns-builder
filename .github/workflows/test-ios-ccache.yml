@@ -1,11 +1,15 @@
-name: Test iOS ccache (no notify)
+name: Test iOS compile cache (no notify)
 
-# Standalone workflow to iterate on the ccache setup WITHOUT touching the team group:
-# - no notify-start job, no Mattermost message, no Drive/Diawi upload (it never calls a
-#   Fastlane lane), no signing/match.
-# - compiles natives for the simulator with SKIP_BUNDLING (ccache only caches the native
-#   C/C++/ObjC compiles, so this faithfully tests whether ccache engages — just faster).
-# - the "ccache stats" step dumps ccache -s + the per-invocation log to pinpoint behaviour.
+# Standalone workflow to iterate on iOS compile caching WITHOUT touching the team group:
+# no notify-start, no Mattermost, no Drive/Diawi upload (never calls a Fastlane lane), no signing.
+#
+# Tests Xcode 26 "compilation caching" (LLVM CAS) — the modern, content-addressed (branch-safe)
+# replacement for ccache that actually works with the new build system / explicit modules.
+# (ccache-via-CC was confirmed dead on Xcode 26.3: 0 invocations on a real 21-min compile.)
+#
+# CAS lives at ~/Library/Developer/Xcode/DerivedData/CompilationCache.noindex (fixed shared path,
+# survives `clean`), so we persist THAT across runs. Run twice: run 1 populates (cold, slow),
+# run 2 reuses (warm) — the "Compile natives" duration on run 2 is the real measure.
 
 on:
   workflow_dispatch:
@@ -19,13 +23,13 @@ on:
         required: true
         default: "staging"
       xcode_version:
-        description: "Xcode version (16.4 or 26.3)"
+        description: "Xcode version (must be 26.x for compilation caching)"
         required: true
         default: "26.3"
 
 jobs:
-  ios-ccache-test:
-    name: iOS ccache test (build only, no notify)
+  ios-compcache-test:
+    name: iOS compile-cache test (build only, no notify)
     environment: ${{ inputs.environment }}
     runs-on: ${{ inputs.xcode_version == '26.3' && 'macos-26' || 'macos-15' }}
     timeout-minutes: 60
@@ -71,24 +75,17 @@ jobs:
           passbolt_env_file: ${{ secrets.PASSBOLT_ENV_FILE }}
           passbolt_private_key: ${{ secrets.PASSBOLT_PRIVATE_KEY }}
 
-      - name: Setup ccache
-        run: |
-          brew list ccache >/dev/null 2>&1 || brew install ccache
-          ccache --version | head -1
-          mkdir -p "$HOME/.cache/ccache"
-          echo "USE_CCACHE=1" >> "$GITHUB_ENV"
-          echo "CCACHE_DIR=$HOME/.cache/ccache" >> "$GITHUB_ENV"
-          echo "CCACHE_MAXSIZE=2G" >> "$GITHUB_ENV"
-          echo "CCACHE_BASEDIR=$GITHUB_WORKSPACE" >> "$GITHUB_ENV"
-          echo "CCACHE_LOGFILE=$HOME/ccache.log" >> "$GITHUB_ENV"
-
-      - name: Restore ccache
+      - name: Restore Xcode compilation cache (CAS)
         uses: actions/cache@v4
         with:
-          path: ~/.cache/ccache
-          key: ccache-ios-${{ inputs.xcode_version }}-${{ github.run_id }}
+          # LLVM CAS: content-addressed (a key = digest of the compilation's contents), so it is
+          # safe to share across branches — a changed input simply misses. Fixed shared path,
+          # not tied to the per-project DerivedData dir; survives `clean`. Rolling key keeps the
+          # newest snapshot per Xcode version.
+          path: ~/Library/Developer/Xcode/DerivedData/CompilationCache.noindex
+          key: xcode-compcache-${{ inputs.xcode_version }}-${{ github.run_id }}
           restore-keys: |
-            ccache-ios-${{ inputs.xcode_version }}-
+            xcode-compcache-${{ inputs.xcode_version }}-
 
       - name: Cache CocoaPods downloads
         uses: actions/cache@v4
@@ -100,11 +97,9 @@ jobs:
 
       - name: iOS Pod install
         working-directory: real-code/ios
-        env:
-          USE_CCACHE: "1"
         run: pod install
 
-      - name: Compile natives (simulator, no sign, no JS bundle)
+      - name: Compile natives (simulator, no sign, no JS bundle, compilation cache ON)
         working-directory: real-code
         env:
           SKIP_BUNDLING: "1"
@@ -115,30 +110,29 @@ jobs:
           else
             SCHEME="TemoorstApp Production Release"
           fi
-          echo "Building scheme: $SCHEME"
+          echo "Building scheme: $SCHEME (COMPILATION_CACHE_ENABLE_CACHING=YES)"
+          # No -derivedDataPath override: keep the default so the CAS lands at the documented
+          # ~/Library/Developer/Xcode/DerivedData/CompilationCache.noindex that we cache above.
           xcodebuild build \
             -workspace ios/TemoorstApp.xcworkspace \
             -scheme "$SCHEME" \
             -configuration Release \
             -sdk iphonesimulator \
             -destination 'generic/platform=iOS Simulator' \
-            -derivedDataPath ios/ccache-test-dd \
+            COMPILATION_CACHE_ENABLE_CACHING=YES \
             CODE_SIGNING_ALLOWED=NO CODE_SIGNING_REQUIRED=NO \
             | tail -60
 
-      - name: ccache stats
+      - name: Compilation cache stats
         if: always()
         run: |
-          echo "===== ccache -s ====="
-          ccache -s -v 2>/dev/null || ccache -s
-          echo "===== ccache.log ====="
-          if [ -f "$HOME/ccache.log" ]; then
-            echo "invocations logged: $(grep -c 'Command line' "$HOME/ccache.log" 2>/dev/null || echo '?')"
-            echo "--- Result breakdown ---"
-            grep -oiE 'Result: .*' "$HOME/ccache.log" | sort | uniq -c | sort -rn | head -20
-            echo "--- first 40 lines ---"
-            head -40 "$HOME/ccache.log"
+          CAS="$HOME/Library/Developer/Xcode/DerivedData/CompilationCache.noindex"
+          echo "===== CompilationCache.noindex ====="
+          if [ -d "$CAS" ]; then
+            du -sh "$CAS"
+            echo "files: $(find "$CAS" -type f 2>/dev/null | wc -l | tr -d ' ')"
           else
-            echo "NO ccache.log present → the ccache wrapper was NEVER invoked during the build."
-            echo "→ Xcode 26.3 is not routing compiles through the CC build setting (CC override ignored)."
+            echo "NO CompilationCache.noindex at default path → compilation caching did NOT engage."
+            echo "Searching DerivedData for any CompilationCache.noindex..."
+            find "$HOME/Library/Developer/Xcode/DerivedData" -maxdepth 3 -name 'CompilationCache.noindex' -type d 2>/dev/null || true
           fi

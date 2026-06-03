@@ -76,8 +76,13 @@ jobs:
       - name: Setup ccache
         run: |
           brew list ccache >/dev/null 2>&1 || brew install ccache
+          ccache --version | head -1
+          # Use ccache's own default dir (~/.cache/ccache). If CCACHE_DIR fails to propagate into
+          # xcodebuild's compiler subprocess, ccache still writes here by default — so the cached
+          # path matches either way, fixing the previous empty-cache ("path does not exist") save.
+          mkdir -p "$HOME/.cache/ccache"
           echo "USE_CCACHE=1" >> "$GITHUB_ENV"
-          echo "CCACHE_DIR=$HOME/Library/Caches/ccache" >> "$GITHUB_ENV"
+          echo "CCACHE_DIR=$HOME/.cache/ccache" >> "$GITHUB_ENV"
           echo "CCACHE_MAXSIZE=2G" >> "$GITHUB_ENV"
           echo "CCACHE_BASEDIR=$GITHUB_WORKSPACE" >> "$GITHUB_ENV"
 
@@ -89,7 +94,7 @@ jobs:
           # simply misses and recompiles (unlike .cxx/DerivedData, which embed per-branch path &
           # incremental state and are never cached). RN ships ccache.conf with Xcode-tuned
           # sloppiness; the rolling key keeps the newest snapshot per Xcode version.
-          path: ~/Library/Caches/ccache
+          path: ~/.cache/ccache
           key: ccache-ios-${{ inputs.xcode_version }}-${{ github.run_id }}
           restore-keys: |
             ccache-ios-${{ inputs.xcode_version }}-
@@ -105,6 +110,8 @@ jobs:
 
       - name: iOS Pod install
         working-directory: real-code/ios
+        env:
+          USE_CCACHE: "1"
         run: pod install --silent
 
       - name: Build & Upload to TestFlight via Fastlane
@@ -123,6 +130,10 @@ jobs:
           DRIVER_KEY_JSON: ${{ secrets.DRIVER_KEY_JSON }}
           FASTLANE_DISABLE_UPDATE_CHECK: true
         run: bundle exec fastlane ios testflight_upload env:${{ inputs.environment }} type:appstore
+
+      - name: ccache stats
+        if: always()
+        run: ccache -s -v 2>/dev/null || ccache -s
 
       - name: Upload Gym log as artifact
         if: failure()

@@ -73,34 +73,18 @@ jobs:
       - name: Prepare mobile build
         uses: ./.github/actions/prepare-mobile-build
 
-      - name: Setup ccache
-        run: |
-          brew list ccache >/dev/null 2>&1 || brew install ccache
-          ccache --version | head -1
-          # Use ccache's own default dir (~/.cache/ccache). If CCACHE_DIR fails to propagate into
-          # xcodebuild's compiler subprocess, ccache still writes here by default — so the cached
-          # path matches either way, fixing the previous empty-cache ("path does not exist") save.
-          mkdir -p "$HOME/.cache/ccache"
-          echo "USE_CCACHE=1" >> "$GITHUB_ENV"
-          echo "CCACHE_DIR=$HOME/.cache/ccache" >> "$GITHUB_ENV"
-          echo "CCACHE_MAXSIZE=2G" >> "$GITHUB_ENV"
-          echo "CCACHE_BASEDIR=$GITHUB_WORKSPACE" >> "$GITHUB_ENV"
-          # Diagnostic: log every ccache invocation so we can see whether the wrapper is called
-          # at all, and if so why it isn't caching (response files / modules / preprocessing / etc).
-          echo "CCACHE_LOGFILE=$HOME/ccache.log" >> "$GITHUB_ENV"
-
-      - name: Restore ccache
+      - name: Restore Xcode compilation cache (CAS)
         uses: actions/cache@v4
         with:
-          # ccache is content-addressed: a hit means identical source + headers + flags, so the
-          # cached object is provably the same. Safe to share across branches — a changed file
-          # simply misses and recompiles (unlike .cxx/DerivedData, which embed per-branch path &
-          # incremental state and are never cached). RN ships ccache.conf with Xcode-tuned
-          # sloppiness; the rolling key keeps the newest snapshot per Xcode version.
-          path: ~/.cache/ccache
-          key: ccache-ios-${{ inputs.xcode_version }}-${{ github.run_id }}
+          # Xcode 26 compilation caching (LLVM CAS). Content-addressed (digest of the compilation's
+          # contents) → safe to share across branches: a changed input simply misses. Fixed shared
+          # path, survives `clean`. Enabled via COMPILATION_CACHE_ENABLE_CACHING=YES in the gym
+          # xcargs (Fastfile). Replaces ccache, which Xcode 26.3 ignored (CC override not honored).
+          # Verified: warm cache cut native compile ~21m -> ~6m. Rolling key keeps newest per Xcode ver.
+          path: ~/Library/Developer/Xcode/DerivedData/CompilationCache.noindex
+          key: xcode-compcache-${{ inputs.xcode_version }}-${{ github.run_id }}
           restore-keys: |
-            ccache-ios-${{ inputs.xcode_version }}-
+            xcode-compcache-${{ inputs.xcode_version }}-
 
       - name: Cache CocoaPods downloads
         uses: actions/cache@v4
@@ -113,11 +97,7 @@ jobs:
 
       - name: iOS Pod install
         working-directory: real-code/ios
-        env:
-          USE_CCACHE: "1"
-        # --silent dropped temporarily so the RN "[Ccache]: Ccache found at ..." line is visible
-        # (confirms ccache wiring). Re-add --silent once ccache is verified working.
-        run: pod install
+        run: pod install --silent
 
       - name: Build & Upload to TestFlight via Fastlane
         working-directory: real-code/fastlane
@@ -136,21 +116,14 @@ jobs:
           FASTLANE_DISABLE_UPDATE_CHECK: true
         run: bundle exec fastlane ios testflight_upload env:${{ inputs.environment }} type:appstore
 
-      - name: ccache stats
+      - name: Compilation cache stats
         if: always()
         run: |
-          echo "===== ccache -s ====="
-          ccache -s -v 2>/dev/null || ccache -s
-          echo "===== ccache.log ====="
-          if [ -f "$HOME/ccache.log" ]; then
-            echo "invocations logged: $(grep -c 'Command line' "$HOME/ccache.log" 2>/dev/null || echo '?')"
-            echo "--- Result breakdown ---"
-            grep -oiE 'Result: .*' "$HOME/ccache.log" | sort | uniq -c | sort -rn | head -20
-            echo "--- first 40 lines ---"
-            head -40 "$HOME/ccache.log"
+          CAS="$HOME/Library/Developer/Xcode/DerivedData/CompilationCache.noindex"
+          if [ -d "$CAS" ]; then
+            du -sh "$CAS"; echo "files: $(find "$CAS" -type f 2>/dev/null | wc -l | tr -d ' ')"
           else
-            echo "NO ccache.log present → the ccache wrapper was NEVER invoked during the build."
-            echo "→ Xcode 26.3 is not routing compiles through the CC build setting (CC override ignored)."
+            echo "NO CompilationCache.noindex → compilation caching did not engage."
           fi
 
       - name: Upload Gym log as artifact

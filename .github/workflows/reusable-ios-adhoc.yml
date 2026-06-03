@@ -108,7 +108,9 @@ jobs:
         working-directory: real-code/ios
         env:
           USE_CCACHE: "1"
-        run: pod install --silent
+        # --silent dropped temporarily so the RN "[Ccache]: Ccache found at ..." line is visible
+        # (confirms ccache wiring). Re-add --silent once ccache is verified working.
+        run: pod install
 
       - name: Build & AdHoc via Fastlane
         working-directory: real-code/fastlane

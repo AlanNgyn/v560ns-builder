@@ -85,6 +85,9 @@ jobs:
           echo "CCACHE_DIR=$HOME/.cache/ccache" >> "$GITHUB_ENV"
           echo "CCACHE_MAXSIZE=2G" >> "$GITHUB_ENV"
           echo "CCACHE_BASEDIR=$GITHUB_WORKSPACE" >> "$GITHUB_ENV"
+          # Diagnostic: log every ccache invocation so we can see whether the wrapper is called
+          # at all, and if so why it isn't caching (response files / modules / preprocessing / etc).
+          echo "CCACHE_LOGFILE=$HOME/ccache.log" >> "$GITHUB_ENV"
 
       - name: Restore ccache
         uses: actions/cache@v4
@@ -135,7 +138,20 @@ jobs:
 
       - name: ccache stats
         if: always()
-        run: ccache -s -v 2>/dev/null || ccache -s
+        run: |
+          echo "===== ccache -s ====="
+          ccache -s -v 2>/dev/null || ccache -s
+          echo "===== ccache.log ====="
+          if [ -f "$HOME/ccache.log" ]; then
+            echo "invocations logged: $(grep -c 'Command line' "$HOME/ccache.log" 2>/dev/null || echo '?')"
+            echo "--- Result breakdown ---"
+            grep -oiE 'Result: .*' "$HOME/ccache.log" | sort | uniq -c | sort -rn | head -20
+            echo "--- first 40 lines ---"
+            head -40 "$HOME/ccache.log"
+          else
+            echo "NO ccache.log present → the ccache wrapper was NEVER invoked during the build."
+            echo "→ Xcode 26.3 is not routing compiles through the CC build setting (CC override ignored)."
+          fi
 
       - name: Upload Gym log as artifact
         if: failure()

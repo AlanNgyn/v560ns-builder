@@ -15,5 +15,5 @@ runs:
     - name: Checkout real code
       shell: bash
       run: |
-        git clone --branch ${{ inputs.branch }} --single-branch \
+        git clone --branch ${{ inputs.branch }} --single-branch --depth 1 \
           ${{ inputs.private_repo_full_name }} real-code

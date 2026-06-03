@@ -45,6 +45,16 @@ jobs:
           branch: ${{ inputs.branch }}
           private_repo_full_name: ${{ secrets.PRIVATE_REPO_FULL_NAME }}
 
+      - name: Cache Yarn dependencies
+        uses: actions/cache@v4
+        with:
+          path: |
+            real-code/node_modules
+            ~/.cache/yarn
+          key: yarn-${{ hashFiles('real-code/yarn.lock') }}
+          restore-keys: |
+            yarn-
+
       - name: Install JS dependencies
         shell: bash
         run: yarn --cwd real-code install --silent
@@ -59,9 +69,39 @@ jobs:
       - name: Prepare mobile build
         uses: ./.github/actions/prepare-mobile-build
 
+      - name: Setup ccache
+        run: |
+          brew list ccache >/dev/null 2>&1 || brew install ccache
+          echo "USE_CCACHE=1" >> "$GITHUB_ENV"
+          echo "CCACHE_DIR=$HOME/Library/Caches/ccache" >> "$GITHUB_ENV"
+          echo "CCACHE_MAXSIZE=2G" >> "$GITHUB_ENV"
+          echo "CCACHE_BASEDIR=$GITHUB_WORKSPACE" >> "$GITHUB_ENV"
+
+      - name: Restore ccache
+        uses: actions/cache@v4
+        with:
+          # ccache is content-addressed: a hit means identical source + headers + flags, so the
+          # cached object is provably the same. Safe to share across branches — a changed file
+          # simply misses and recompiles (unlike .cxx/DerivedData, which embed per-branch path &
+          # incremental state and are never cached). RN ships ccache.conf with Xcode-tuned
+          # sloppiness; the rolling key keeps the newest snapshot per Xcode version.
+          path: ~/Library/Caches/ccache
+          key: ccache-ios-${{ inputs.xcode_version }}-${{ github.run_id }}
+          restore-keys: |
+            ccache-ios-${{ inputs.xcode_version }}-
+
+      - name: Cache CocoaPods downloads
+        uses: actions/cache@v4
+        with:
+          # Downloaded pod tarballs, addressed by pod + version → branch-safe. Keyed on Podfile.lock.
+          path: ~/Library/Caches/CocoaPods
+          key: cocoapods-${{ hashFiles('real-code/ios/Podfile.lock') }}
+          restore-keys: |
+            cocoapods-
+
       - name: iOS Pod install
         working-directory: real-code/ios
-        run: pod install --repo-update --silent
+        run: pod install --silent
 
       - name: Build & AdHoc via Fastlane
         working-directory: real-code/fastlane

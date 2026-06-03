@@ -82,10 +82,13 @@ jobs:
           # safe to share across branches — a changed input simply misses. Fixed shared path,
           # not tied to the per-project DerivedData dir; survives `clean`. Rolling key keeps the
           # newest snapshot per Xcode version.
+          # Separate key prefix from the real workflows: this test builds for the SIMULATOR, whose
+          # CAS entries don't match the real DEVICE build. Sharing a prefix would let a test run's
+          # simulator cache become the "latest" and get restored into a real device build (= cold).
           path: ~/Library/Developer/Xcode/DerivedData/CompilationCache.noindex
-          key: xcode-compcache-${{ inputs.xcode_version }}-${{ github.run_id }}
+          key: xcode-compcache-test-${{ inputs.xcode_version }}-${{ github.run_id }}
           restore-keys: |
-            xcode-compcache-${{ inputs.xcode_version }}-
+            xcode-compcache-test-${{ inputs.xcode_version }}-
 
       - name: Cache CocoaPods downloads
         uses: actions/cache@v4

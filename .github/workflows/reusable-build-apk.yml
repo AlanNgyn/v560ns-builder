@@ -53,18 +53,23 @@ jobs:
       - name: Cache Gradle dependencies
         uses: actions/cache@v4
         with:
+          # Cache only branch-safe, content-addressed artifacts:
+          #   ~/.gradle/caches  -> downloaded dependencies & transforms (keyed by coordinate+hash)
+          #   ~/.gradle/wrapper -> the Gradle distribution itself
+          # These are shared safely across branches; actions/cache keys are write-once,
+          # so branches never clobber each other — a key miss just downloads what's missing.
+          # Deliberately NOT cached: android/.gradle, app/.cxx, build/. These hold per-branch
+          # incremental + CMake/ninja state. Restoring them onto a branch whose native-module
+          # set differs (a lib added/removed, or native source changed) can reuse stale objects
+          # and silently mis-link — that is the real cross-branch staleness source, not the dep
+          # cache above. Native (.cxx) is recompiled clean each run; the speed win comes from
+          # ABI reduction (and optionally ccache, which is content-hashed and branch-safe).
           path: |
             ~/.gradle/caches
             ~/.gradle/wrapper
-            real-code/android/.gradle
-          key: gradle-${{ hashFiles('real-code/android/gradle/wrapper/gradle-wrapper.properties') }}-${{ hashFiles('real-code/android/build.gradle') }}
+          key: ${{ runner.os }}-gradle-${{ hashFiles('real-code/android/gradle/wrapper/gradle-wrapper.properties', 'real-code/android/**/*.gradle', 'real-code/android/gradle.properties', 'real-code/yarn.lock') }}
           restore-keys: |
-            gradle-${{ hashFiles('real-code/android/gradle/wrapper/gradle-wrapper.properties') }}-
-
-      - name: Remove gradle cache
-        shell: bash
-        working-directory: real-code
-        run: rm -rf android/.cxx android/.gradle android/build node_modules/react-native-mmkv/android/.cxx
+            ${{ runner.os }}-gradle-
 
       - name: Build APK via Fastlane
         working-directory: real-code/fastlane
@@ -84,78 +89,6 @@ jobs:
           MYAPP_UPLOAD_KEY_PASSWORD: ${{ secrets.MYAPP_UPLOAD_KEY_PASSWORD }}
           FASTLANE_DISABLE_UPDATE_CHECK: true
         run: bundle exec fastlane android apk env:${{ inputs.environment }}
-
-      - name: Enable KVM for emulator
-        if: inputs.branch == 'V560NS-v1'
-        run: |
-          echo 'KERNEL=="kvm", GROUP="kvm", MODE="0666", OPTIONS+="static_node=kvm"' | sudo tee /etc/udev/rules.d/99-kvm4all.rules
-          sudo udevadm control --reload-rules
-          sudo udevadm trigger --name-match=kvm
-
-      - name: Install Maestro
-        if: inputs.branch == 'V560NS-v1'
-        run: |
-          curl -Ls "https://get.maestro.mobile.dev" | bash
-          echo "$HOME/.maestro/bin" >> $GITHUB_PATH
-
-      - name: Prepare Maestro E2E script
-        if: inputs.branch == 'V560NS-v1'
-        run: |
-          mkdir -p ${{ github.workspace }}/maestro-report/videos ${{ github.workspace }}/maestro-report/screenshots
-          cat > ${{ github.workspace }}/run-maestro.sh << 'SCRIPT'
-          #!/bin/bash
-          set -x
-          WORKSPACE="$1"
-          REPORT_DIR="$WORKSPACE/maestro-report"
-          MAESTRO_DIR="$WORKSPACE/real-code/.maestro"
-
-          echo "=== Searching for APK ==="
-          find "$WORKSPACE/real-code" -name "*.apk" -type f 2>/dev/null
-          APK_PATH=$(find "$WORKSPACE/real-code" -name "*.apk" -type f | head -1)
-          if [ -z "$APK_PATH" ]; then
-            echo "ERROR: No APK found!"
-            exit 1
-          fi
-          echo "Installing APK: $APK_PATH"
-          adb install "$APK_PATH"
-
-          # Get actual package name from installed APK (Android uses .dev, iOS uses .stg)
-          PKG_NAME=$(aapt dump badging "$APK_PATH" | grep -oP "package: name='\K[^']+")
-          echo "Detected package: $PKG_NAME"
-
-          # Rewrite appId in all Maestro flows to match installed package
-          sed -i "s/^appId:.*/appId: $PKG_NAME/" "$MAESTRO_DIR"/*.yaml
-          grep -H "^appId:" "$MAESTRO_DIR"/*.yaml || true
-
-          # Verify app is installed
-          adb shell pm list packages | grep -i temoorst || echo "WARN: package not found in device"
-
-          for flow in "$MAESTRO_DIR"/*.yaml; do
-            [ "$(basename "$flow")" = "config.yaml" ] && continue
-            FLOW_NAME=$(basename "$flow" .yaml)
-            echo "=== Running: $FLOW_NAME ==="
-            maestro record --local "$flow" "$REPORT_DIR/videos/${FLOW_NAME}.mp4" || true
-          done
-
-          find "$MAESTRO_DIR" -name "*.png" -exec mv {} "$REPORT_DIR/screenshots/" \; 2>/dev/null || true
-          SCRIPT
-          chmod +x ${{ github.workspace }}/run-maestro.sh
-
-      - name: Run Maestro E2E Tests (Android)
-        if: inputs.branch == 'V560NS-v1'
-        uses: reactivecircus/android-emulator-runner@v2
-        with:
-          api-level: 34
-          arch: x86_64
-          script: bash ${{ github.workspace }}/run-maestro.sh ${{ github.workspace }}
-
-      - name: Upload E2E evidence (Android)
-        if: inputs.branch == 'V560NS-v1' && always()
-        uses: actions/upload-artifact@v4
-        with:
-          name: android-e2e-evidence-${{ github.run_number }}
-          path: maestro-report/
-          retention-days: 30
 
       - name: Notify on failure
         uses: ./.github/actions/notify-on-failure

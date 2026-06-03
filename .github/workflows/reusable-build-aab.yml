@@ -51,21 +51,26 @@ jobs:
       - name: Prepare mobile build
         uses: ./.github/actions/prepare-mobile-build
 
-      # - name: Cache Gradle dependencies
-      #   uses: actions/cache@v4
-      #   with:
-      #     path: |
-      #       ~/.gradle/caches
-      #       ~/.gradle/wrapper
-      #       real-code/android/.gradle
-      #     key: gradle-${{ hashFiles('real-code/android/gradle/wrapper/gradle-wrapper.properties') }}-${{ hashFiles('real-code/android/build.gradle') }}
-      #     restore-keys: |
-      #       gradle-${{ hashFiles('real-code/android/gradle/wrapper/gradle-wrapper.properties') }}-
-
-      # - name: Remove gradle cache
-      #   shell: bash
-      #   working-directory: real-code
-      #   run: rm -rf android/.cxx android/.gradle android/build node_mofdules/react-native-mmkv/android/.cxx
+      - name: Cache Gradle dependencies
+        uses: actions/cache@v4
+        with:
+          # Cache only branch-safe, content-addressed artifacts:
+          #   ~/.gradle/caches  -> downloaded dependencies & transforms (keyed by coordinate+hash)
+          #   ~/.gradle/wrapper -> the Gradle distribution itself
+          # These are shared safely across branches; actions/cache keys are write-once,
+          # so branches never clobber each other — a key miss just downloads what's missing.
+          # Deliberately NOT cached: android/.gradle, app/.cxx, build/. These hold per-branch
+          # incremental + CMake/ninja state. Restoring them onto a branch whose native-module
+          # set differs (a lib added/removed, or native source changed) can reuse stale objects
+          # and silently mis-link — that is the real cross-branch staleness source, not the dep
+          # cache above. Native (.cxx) is recompiled clean each run; the speed win comes from
+          # ABI reduction (and optionally ccache, which is content-hashed and branch-safe).
+          path: |
+            ~/.gradle/caches
+            ~/.gradle/wrapper
+          key: ${{ runner.os }}-gradle-${{ hashFiles('real-code/android/gradle/wrapper/gradle-wrapper.properties', 'real-code/android/**/*.gradle', 'real-code/android/gradle.properties', 'real-code/yarn.lock') }}
+          restore-keys: |
+            ${{ runner.os }}-gradle-
 
       - name: Build AAB via Fastlane
         working-directory: real-code/fastlane
